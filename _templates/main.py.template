@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""
+{{SKILL_NAME}} — {{SHORT_DESCRIPTION}}
+
+Usage:
+  main.py <command> [options]
+  main.py --help
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+# Allow importing _lib without pip install
+_SKILL_DIR = Path(__file__).resolve().parent.parent   # scripts/ -> skill-dir/
+_LIB_DIR = _SKILL_DIR.parent / "_lib"                 # skill-dir/ -> repo-root/ -> _lib/
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
+
+from env_loader import get, get_data_dir
+from logger import info, success, warning, error, header
+
+
+# ---------------------------------------------------------------------------
+# Data helpers
+# ---------------------------------------------------------------------------
+
+def get_data_file() -> Path:
+    return get_data_dir() / "{{DATA_FILE}}"
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+def cmd_example(args):
+    info("Running example command...")
+    success("Done.")
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="{{SHORT_DESCRIPTION}}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    # example subcommand
+    p_example = sub.add_parser("example", help="Example command")
+    p_example.add_argument("--verbose", action="store_true")
+
+    args = parser.parse_args()
+    dispatch = {"example": cmd_example}
+    dispatch[args.cmd](args)
+
+
+if __name__ == "__main__":
+    main()

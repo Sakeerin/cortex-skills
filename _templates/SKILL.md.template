@@ -1,0 +1,41 @@
+---
+name: {{SKILL_NAME}}
+description: {{SHORT_DESCRIPTION}}
+version: 0.1.0
+providers: claude, gemini, openai, ollama, generic
+---
+
+# {{SKILL_NAME}}
+
+> {{SHORT_DESCRIPTION}}
+
+## When to Use
+
+Activate this skill when the user asks to {{USE_CASE_TRIGGER}}.
+
+## Usage
+
+```bash
+# Via Python (always works)
+python3 ~/.ai-skills/{{SKILL_NAME}}/scripts/main.py <command> [options]
+
+# Via shell wrapper (if ~/.ai-skills/{{SKILL_NAME}}/ is in PATH)
+{{SKILL_NAME}} <command> [options]
+```
+
+### Commands
+
+```bash
+{{SKILL_NAME}} <command>      # {{COMMAND_DESCRIPTION}}
+{{SKILL_NAME}} --help         # Show all options
+```
+
+## Data
+
+Stored at `$AI_SKILLS_DATA_DIR/{{DATA_FILE}}` (default: `~/.ai-skills-data/{{DATA_FILE}}`).
+
+## Notes
+
+- {{NOTE_1}}
+- Requires Python 3.11+
+- Works with any AI provider (provider-agnostic)
