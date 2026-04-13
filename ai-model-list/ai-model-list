@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ai-model-list - shell wrapper for ai-model-list skill
+set -euo pipefail
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$SKILL_DIR/scripts/ai_model_list.py" "$@"

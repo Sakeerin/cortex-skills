@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ai-cost - shell wrapper for ai-cost skill
+set -euo pipefail
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$SKILL_DIR/scripts/ai_cost.py" "$@"

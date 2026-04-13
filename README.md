@@ -47,7 +47,7 @@ echo 'for d in ~/.ai-skills/*/; do export PATH="$d:$PATH"; done' >> ~/.zshrc
 
 ---
 
-## Skills (Phase 1)
+## Skills
 
 | Skill | Description | Invoke |
 |---|---|---|
@@ -56,6 +56,11 @@ echo 'for d in ~/.ai-skills/*/; do export PATH="$d:$PATH"; done' >> ~/.zshrc
 | `sync-git` | Git sync — pull, auto-commit, push | `bash sync-git/scripts/sync.sh` |
 | `env-check` | Verify API keys and connectivity | `python3 env-check/scripts/env_check.py` |
 | `skill-creator` | Guide for creating new skills | See `skill-creator/SKILL.md` |
+| `ai-provider` | Detect active provider, set defaults, run connectivity tests | `python3 ai-provider/scripts/ai_provider.py` |
+| `ai-context` | Show model context limits and usage headroom | `python3 ai-context/scripts/ai_context.py` |
+| `ai-model-list` | List provider models or compare catalogs | `python3 ai-model-list/scripts/ai_model_list.py` |
+| `ai-cost` | Track daily, weekly, monthly, and per-model cost | `python3 ai-cost/scripts/ai_cost.py` |
+| `token-budget` | Manage daily, session, and monthly budgets | `python3 token-budget/scripts/token_budget.py` |
 
 See [skills.md](skills.md) for the full list including upcoming phases.
 
