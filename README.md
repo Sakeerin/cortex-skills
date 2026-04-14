@@ -159,20 +159,6 @@ AI_SKILLS_DATA_DIR=~/.ai-skills-data
 
 ---
 
-## Roadmap
-
-| Phase | Status | Focus |
-|---|---|---|
-| 1 — Foundation | ✅ Done | `_lib`, `time`, `todo`, `sync-git`, `env-check` |
-| 2 — AI Provider Layer | 🔧 Planned | `ai-provider`, `ai-cost`, `ai-context`, `token-budget` |
-| 3 — Productivity | 🔧 Planned | `notes`, `prompt-lib`, `memory`, `git-summary`, `project-brief` |
-| 4 — Reporting | 🔧 Planned | `daily-report`, `ai-session-log`, `skill-creator` enhanced |
-| 5 — Polish | 🔧 Planned | Tests, CI, docs, community release |
-
-<!-- See [ai-skills-development-plan.md](ai-skills-development-plan.md) for the full roadmap. -->
-
----
-
 ## License
 
 MIT

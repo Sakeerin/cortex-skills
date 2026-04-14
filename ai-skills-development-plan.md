@@ -641,11 +641,11 @@ Skills are in ~/.ai-skills/. Run skill-name to use.
 ### Phase 3 — Productivity Skills (สัปดาห์ที่ 5–6)
 **เป้าหมาย:** Skills ที่เพิ่ม developer workflow
 
-- [ ] implement `notes`
-- [ ] implement `prompt-lib` (add, list, search, use, template variables)
-- [ ] implement `memory` (add, list, get, context, export)
-- [ ] implement `git-summary` (diff, log, format prompt)
-- [ ] implement `project-brief` (init, show, inject, validate)
+- [x] implement `notes`
+- [x] implement `prompt-lib` (add, list, search, use, template variables)
+- [x] implement `memory` (add, list, get, context, export)
+- [x] implement `git-summary` (diff, log, format prompt)
+- [x] implement `project-brief` (init, show, inject, validate)
 
 **Deliverable:** Productivity skills ครบชุด
 
