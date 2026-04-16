@@ -654,11 +654,11 @@ Skills are in ~/.ai-skills/. Run skill-name to use.
 ### Phase 4 — Reporting & Integration (สัปดาห์ที่ 7–8)
 **เป้าหมาย:** Cross-skill integration และ reporting
 
-- [ ] implement `daily-report` (combine todo + git + cost + notes)
-- [ ] implement `ai-session-log` พร้อม adapter สำหรับ Claude และ Gemini
-- [ ] implement `skill-creator` (enhanced, พร้อม multi-provider template)
-- [ ] เขียน install script (`install.sh`) แบบ interactive
-- [ ] pipeline test: ทุก skill ทำงานร่วมกันได้
+- [x] implement `daily-report` (combine todo + git + cost + notes)
+- [x] implement `ai-session-log` พร้อม adapter สำหรับ Claude และ Gemini
+- [x] implement `skill-creator` (enhanced, พร้อม multi-provider template)
+- [x] เขียน install script (`install.sh`) แบบ interactive
+- [x] pipeline test: ทุก skill ทำงานร่วมกันได้
 
 **Deliverable:** ระบบสมบูรณ์พร้อม publish
 

@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Guide for creating a new AI skill in this repo
+description: Scaffold and manage AI skills — create from template, list, validate
 providers: claude, gemini, openai, ollama, generic
 ---
 
