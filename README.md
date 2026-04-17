@@ -52,17 +52,19 @@ echo 'for d in ~/.ai-skills/*/; do export PATH="$d:$PATH"; done' >> ~/.zshrc
 | Skill | Description | Invoke |
 |---|---|---|
 | `time` | Current date and time | `date` |
-| `todo` | Task management with priority, tags, projects | `python3 todo/scripts/tasks.py` |
-| `sync-git` | Git sync — pull, auto-commit, push | `bash sync-git/scripts/sync.sh` |
-| `env-check` | Verify API keys and connectivity | `python3 env-check/scripts/env_check.py` |
-| `skill-creator` | Guide for creating new skills | See `skill-creator/SKILL.md` |
-| `ai-provider` | Detect active provider, set defaults, run connectivity tests | `python3 ai-provider/scripts/ai_provider.py` |
-| `ai-context` | Show model context limits and usage headroom | `python3 ai-context/scripts/ai_context.py` |
-| `ai-model-list` | List provider models or compare catalogs | `python3 ai-model-list/scripts/ai_model_list.py` |
-| `ai-cost` | Track daily, weekly, monthly, and per-model cost | `python3 ai-cost/scripts/ai_cost.py` |
-| `token-budget` | Manage daily, session, and monthly budgets | `python3 token-budget/scripts/token_budget.py` |
+| `todo` | Task management with priority, tags, projects | `todo add --title "Fix bug" --priority high` |
+| `sync-git` | Git sync — pull, auto-commit, push | `sync-git` |
+| `env-check` | Verify API keys and connectivity | `env-check --fix` |
+| `notes` | Capture and search daily notes | `notes add "Remember to deploy"` |
+| `prompt-lib` | Personal prompt library with template variables | `prompt-lib use my-prompt --with key=value` |
+| `memory` | Persistent key/value memory for AI context | `memory add "stack" "Python + FastAPI"` |
+| `git-summary` | Human-readable git diff summaries | `git-summary --staged --format prompt` |
+| `project-brief` | Manage `BRIEF.md` project context | `project-brief inject` |
+| `daily-report` | Generate daily standup from todos + git + notes | `daily-report` |
+| `ai-session-log` | Browse and search Claude/Gemini session history | `ai-session-log --latest --count 5` |
+| `skill-creator` | Scaffold and validate new skills | `skill-creator new my-skill` |
 
-See [skills.md](skills.md) for the full list including upcoming phases.
+See [skills.md](skills.md) for the full catalog with data paths and compatibility matrix.
 
 ---
 
@@ -97,15 +99,25 @@ Run `python3 ~/.ai-skills/project-brief/scripts/main.py inject` *(Phase 3)* to g
 ## Repo Structure
 
 ```
-ai-skills/
+cortex-skills/
 ├── _lib/               # Shared Python utilities (env_loader, ai_provider, logger)
 ├── _templates/         # Boilerplate for new skills
 ├── time/               # Skill: current date/time
 ├── todo/               # Skill: task management
 ├── sync-git/           # Skill: git sync
 ├── env-check/          # Skill: check API keys & connectivity
-├── skill-creator/      # Guide: create new skills
-└── skills.md           # Full skill catalog
+├── notes/              # Skill: daily notes
+├── prompt-lib/         # Skill: prompt library
+├── memory/             # Skill: persistent memory
+├── git-summary/        # Skill: git diff summaries
+├── project-brief/      # Skill: project context (BRIEF.md)
+├── daily-report/       # Skill: daily standup report
+├── ai-session-log/     # Skill: session history browser
+├── skill-creator/      # Skill: scaffold new skills
+├── tests/              # Integration tests (pytest)
+├── install.sh          # Interactive installer
+├── skills.md           # Full skill catalog
+└── CONTRIBUTING.md     # How to add new skills
 ```
 
 Each skill follows this structure:
@@ -119,6 +131,37 @@ Each skill follows this structure:
 
 ---
 
+## Demo
+
+```bash
+# Run the interactive demo
+bash demo.sh
+```
+
+Or try skills manually:
+
+```bash
+# Track a task
+todo add --title "Review PR #42" --priority high --tag dev
+
+# Save a note
+notes add "Standup: shipping auth refactor today"
+
+# Remember something for AI context
+memory add "stack" "Python 3.12, FastAPI, PostgreSQL"
+
+# Generate AI context block (paste into any system prompt)
+project-brief inject
+
+# Daily standup report
+daily-report
+
+# Scaffold a new skill
+skill-creator new my-skill --description "My custom skill"
+```
+
+---
+
 ## Data Storage
 
 All skill data is stored at `~/.ai-skills-data/` (configurable via `AI_SKILLS_DATA_DIR`):
@@ -126,10 +169,10 @@ All skill data is stored at `~/.ai-skills-data/` (configurable via `AI_SKILLS_DA
 ```
 ~/.ai-skills-data/
 ├── todos.jsonl         # todo tasks
-├── notes.jsonl         # notes (Phase 3)
-├── memory.jsonl        # persistent memory (Phase 3)
-├── prompts.json        # prompt library (Phase 3)
-└── cost-log.jsonl      # AI cost tracking (Phase 2)
+├── notes.jsonl         # notes
+├── memory.jsonl        # persistent memory
+├── prompts.json        # prompt library
+└── cost-log.jsonl      # AI cost tracking
 ```
 
 Uses append-only **JSONL** format — no database required.

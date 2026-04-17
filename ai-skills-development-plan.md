@@ -667,12 +667,12 @@ Skills are in ~/.ai-skills/. Run skill-name to use.
 ### Phase 5 — Polish & Docs (สัปดาห์ที่ 9–10)
 **เป้าหมาย:** Documentation, testing, และ community readiness
 
-- [ ] เขียน `SKILL.md` ครบทุก skill
-- [ ] เพิ่ม `--help` ในทุก skill
-- [ ] เขียน integration tests (`tests/`)
-- [ ] สร้าง GitHub Actions CI pipeline
-- [ ] เขียน contribution guide
-- [ ] สร้าง demo video / GIF สำหรับ README
+- [x] เขียน `SKILL.md` ครบทุก skill
+- [x] เพิ่ม `--help` ในทุก skill
+- [x] เขียน integration tests (`tests/`) — 42 tests, all passing
+- [x] สร้าง GitHub Actions CI pipeline (`.github/workflows/ci.yml`)
+- [x] เขียน contribution guide (`CONTRIBUTING.md`)
+- [x] สร้าง demo script (`demo.sh`) และ update README
 - [ ] publish และ announce
 
 **Deliverable:** Public release-ready
