@@ -17,13 +17,19 @@ import os
 from pathlib import Path
 
 _loaded = False
+_loaded_signature = None
+_loaded_values: dict[str, str] = {}
 
 
 def load_env() -> None:
     """Load env vars from config files. Safe to call multiple times."""
-    global _loaded
-    if _loaded:
+    global _loaded, _loaded_signature
+
+    signature = _get_signature()
+    if _loaded and _loaded_signature == signature:
         return
+
+    _unload_previous_file_values()
 
     candidates = [
         Path.home() / ".ai-skills.env",
@@ -36,10 +42,37 @@ def load_env() -> None:
             _parse_env_file(path)
 
     _loaded = True
+    _loaded_signature = signature
+
+
+def _get_signature() -> tuple:
+    candidates = [
+        Path.home() / ".ai-skills.env",
+        Path.cwd() / ".ai-skills.env",
+        Path.cwd() / ".env",
+    ]
+    signature = [str(Path.cwd().resolve())]
+    for path in candidates:
+        resolved = path.resolve()
+        if path.exists():
+            stat = path.stat()
+            signature.append((str(resolved), stat.st_mtime_ns, stat.st_size))
+        else:
+            signature.append((str(resolved), None, None))
+    return tuple(signature)
+
+
+def _unload_previous_file_values() -> None:
+    global _loaded_values
+    for key, value in list(_loaded_values.items()):
+        if os.environ.get(key) == value:
+            os.environ.pop(key, None)
+    _loaded_values = {}
 
 
 def _parse_env_file(path: Path) -> None:
     """Parse a .env file and set environment variables (does not override existing)."""
+    global _loaded_values
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -58,6 +91,15 @@ def _parse_env_file(path: Path) -> None:
                 value = value[1:-1]
             if key and key not in os.environ:
                 os.environ[key] = value
+                _loaded_values[key] = value
+
+
+def reload_env() -> None:
+    """Force config reload on next access."""
+    global _loaded, _loaded_signature
+    _unload_previous_file_values()
+    _loaded = False
+    _loaded_signature = None
 
 
 def get(key: str, default: str = None) -> str:

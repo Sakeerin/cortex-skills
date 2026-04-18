@@ -26,6 +26,7 @@ PROVIDER_METADATA = {
     "claude": {
         "display_name": "Claude Code",
         "env_keys": ["ANTHROPIC_API_KEY"],
+        "base_url_keys": ["ANTHROPIC_BASE_URL", "CLAUDE_BASE_URL"],
         "model_keys": ["AI_MODEL", "CLAUDE_MODEL", "ANTHROPIC_MODEL"],
         "cli_tool": "claude",
         "session_dir": Path.home() / ".claude" / "projects",
@@ -36,6 +37,7 @@ PROVIDER_METADATA = {
     "gemini": {
         "display_name": "Gemini CLI",
         "env_keys": ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
+        "base_url_keys": ["GEMINI_BASE_URL", "GOOGLE_BASE_URL"],
         "model_keys": ["AI_MODEL", "GEMINI_MODEL", "GOOGLE_MODEL"],
         "cli_tool": "gemini",
         "session_dir": Path.home() / ".gemini",
@@ -46,6 +48,7 @@ PROVIDER_METADATA = {
     "openai": {
         "display_name": "OpenAI",
         "env_keys": ["OPENAI_API_KEY"],
+        "base_url_keys": ["OPENAI_BASE_URL"],
         "model_keys": ["AI_MODEL", "OPENAI_MODEL"],
         "cli_tool": "openai",
         "session_dir": None,
@@ -56,6 +59,7 @@ PROVIDER_METADATA = {
     "ollama": {
         "display_name": "Ollama",
         "env_keys": [],
+        "base_url_keys": ["OLLAMA_BASE_URL", "AI_BASE_URL"],
         "model_keys": ["AI_MODEL", "OLLAMA_MODEL"],
         "cli_tool": "ollama",
         "session_dir": None,
@@ -66,6 +70,7 @@ PROVIDER_METADATA = {
     "mistral": {
         "display_name": "Mistral",
         "env_keys": ["MISTRAL_API_KEY"],
+        "base_url_keys": ["MISTRAL_BASE_URL"],
         "model_keys": ["AI_MODEL", "MISTRAL_MODEL"],
         "cli_tool": "mistral",
         "session_dir": None,
@@ -76,6 +81,7 @@ PROVIDER_METADATA = {
     "lmstudio": {
         "display_name": "LM Studio",
         "env_keys": [],
+        "base_url_keys": ["LMSTUDIO_BASE_URL", "AI_BASE_URL"],
         "model_keys": ["AI_MODEL", "LMSTUDIO_MODEL"],
         "cli_tool": "lms",
         "session_dir": None,
@@ -190,10 +196,22 @@ def get_api_key(provider: str | None = None) -> str | None:
     return None
 
 
+def get_base_url_env_key(provider: str | None = None) -> str | None:
+    provider = normalize_provider(provider) if provider else detect()
+    keys = PROVIDER_METADATA.get(provider, {}).get("base_url_keys", [])
+    return keys[0] if keys else None
+
+
 def get_base_url(provider: str | None = None) -> str | None:
     load_env()
     provider = normalize_provider(provider) if provider else detect()
-    return os.environ.get("AI_BASE_URL") or PROVIDER_METADATA.get(provider, {}).get("default_base_url")
+    for key in PROVIDER_METADATA.get(provider, {}).get("base_url_keys", []):
+        value = os.environ.get(key)
+        if value:
+            return value
+    if provider == "unknown":
+        return os.environ.get("AI_BASE_URL")
+    return PROVIDER_METADATA.get(provider, {}).get("default_base_url")
 
 
 def get_context_limit(model: str | None = None) -> int:
@@ -283,7 +301,9 @@ def set_provider(
     if model:
         updates["AI_MODEL"] = model
     if base_url:
-        updates["AI_BASE_URL"] = base_url
+        base_url_key = get_base_url_env_key(normalized)
+        if base_url_key:
+            updates[base_url_key] = base_url
     _write_env_updates(target, updates)
 
     for key, value in updates.items():

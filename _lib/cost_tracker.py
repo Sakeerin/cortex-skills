@@ -40,8 +40,18 @@ class CostTracker:
         self.log_path = self.data_dir / "cost-log.jsonl"
         self.budget_path = self.data_dir / "budget.json"
         self.rate_path = Path(__file__).resolve().parent.parent / "cost-rates.json"
+        self._rates_cache: dict[str, dict[str, float]] | None = None
+        self._rates_signature: tuple | None = None
+        self._events_cache: list[dict[str, object]] | None = None
+        self._events_signature: tuple | None = None
+        self._budgets_cache: dict[str, object] | None = None
+        self._budgets_signature: tuple | None = None
 
     def load_rates(self) -> dict[str, dict[str, float]]:
+        signature = self._file_signature(self.rate_path)
+        if self._rates_cache is not None and self._rates_signature == signature:
+            return dict(self._rates_cache)
+
         rates = dict(DEFAULT_RATES)
         if self.rate_path.exists():
             try:
@@ -54,7 +64,10 @@ class CostTracker:
                         }
             except (json.JSONDecodeError, ValueError):
                 pass
-        return rates
+
+        self._rates_cache = dict(rates)
+        self._rates_signature = signature
+        return dict(rates)
 
     def get_rate(self, model: str, provider: str | None = None) -> dict[str, float]:
         model_key = (model or "").lower()
@@ -113,12 +126,24 @@ class CostTracker:
         }
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+        if self._events_cache is not None:
+            self._events_cache.append(event)
+            self._events_signature = self._file_signature(self.log_path)
+
         self._increment_session_spend(cost_usd)
         return event
 
     def load_events(self) -> list[dict[str, object]]:
+        signature = self._file_signature(self.log_path)
+        if self._events_cache is not None and self._events_signature == signature:
+            return list(self._events_cache)
+
         if not self.log_path.exists():
+            self._events_cache = []
+            self._events_signature = signature
             return []
+
         events: list[dict[str, object]] = []
         with self.log_path.open("r", encoding="utf-8") as handle:
             for line in handle:
@@ -129,7 +154,10 @@ class CostTracker:
                     events.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue
-        return events
+
+        self._events_cache = list(events)
+        self._events_signature = signature
+        return list(events)
 
     def get_daily_cost(self, target_date: date | None = None) -> float:
         target_date = target_date or datetime.now().astimezone().date()
@@ -198,28 +226,39 @@ class CostTracker:
         return output_path
 
     def get_budgets(self) -> dict[str, object]:
+        signature = self._file_signature(self.budget_path)
+        if self._budgets_cache is not None and self._budgets_signature == signature:
+            return dict(self._budgets_cache)
+
         if not self.budget_path.exists():
-            return {
+            budgets = {
                 "daily": None,
                 "session": None,
                 "monthly": None,
                 "alert_threshold": 80,
                 "session_spend": 0.0,
             }
-        try:
-            data = json.loads(self.budget_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            data = {}
-        return {
-            "daily": data.get("daily"),
-            "session": data.get("session"),
-            "monthly": data.get("monthly"),
-            "alert_threshold": data.get("alert_threshold", 80),
-            "session_spend": float(data.get("session_spend", 0.0)),
-        }
+        else:
+            try:
+                data = json.loads(self.budget_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                data = {}
+            budgets = {
+                "daily": data.get("daily"),
+                "session": data.get("session"),
+                "monthly": data.get("monthly"),
+                "alert_threshold": data.get("alert_threshold", 80),
+                "session_spend": float(data.get("session_spend", 0.0)),
+            }
+
+        self._budgets_cache = dict(budgets)
+        self._budgets_signature = signature
+        return dict(budgets)
 
     def save_budgets(self, budgets: dict[str, object]) -> None:
         self.budget_path.write_text(json.dumps(budgets, indent=2), encoding="utf-8")
+        self._budgets_cache = dict(budgets)
+        self._budgets_signature = self._file_signature(self.budget_path)
 
     def set_budget(self, budget_type: str, amount: float) -> dict[str, object]:
         budgets = self.get_budgets()
@@ -271,3 +310,10 @@ class CostTracker:
             return datetime.fromisoformat(raw).astimezone().date()
         except ValueError:
             return datetime.now().astimezone().date()
+
+    @staticmethod
+    def _file_signature(path: Path) -> tuple:
+        if not path.exists():
+            return (str(path), None, None)
+        stat = path.stat()
+        return (str(path), stat.st_mtime_ns, stat.st_size)

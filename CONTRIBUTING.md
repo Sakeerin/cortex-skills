@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This guide covers how to add new sk
 ## Getting Started
 
 ```bash
-git clone https://github.com/your-username/cortex-skills
+git clone https://github.com/Sakeerin/cortex-skills
 cd cortex-skills
 pip install pytest   # only test dependency
 pytest tests/ -v
@@ -148,4 +148,4 @@ Checks:
 
 ## Questions?
 
-Open an issue at [github.com/your-username/cortex-skills/issues](https://github.com/your-username/cortex-skills/issues).
+Open an issue at [github.com/Sakeerin/cortex-skills/issues](https://github.com/Sakeerin/cortex-skills/issues).

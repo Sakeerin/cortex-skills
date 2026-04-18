@@ -9,7 +9,7 @@ Provider-agnostic tools for developer workflows: task management, git sync, cost
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+git clone https://github.com/Sakeerin/cortex-skills ~/.ai-skills
 bash ~/.ai-skills/install.sh
 ```
 
@@ -17,7 +17,7 @@ Or manually in 3 steps:
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+git clone https://github.com/Sakeerin/cortex-skills ~/.ai-skills
 
 # 2. Configure provider
 cat > ~/.ai-skills.env << 'EOF'

@@ -22,6 +22,7 @@ if str(_LIB_DIR) not in sys.path:
 from ai_provider import (
     PROVIDER_METADATA,
     detect,
+    get_base_url_env_key,
     get_context_limit,
     get_provider_details,
     list_supported,
@@ -68,7 +69,8 @@ def cmd_set(args) -> None:
     if args.model:
         print(f"AI_MODEL={args.model}")
     if args.base_url:
-        print(f"AI_BASE_URL={args.base_url}")
+        base_url_key = get_base_url_env_key(args.provider) or "AI_BASE_URL"
+        print(f"{base_url_key}={args.base_url}")
 
 
 def cmd_test(args) -> None:

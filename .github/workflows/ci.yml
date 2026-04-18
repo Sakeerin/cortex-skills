@@ -45,7 +45,9 @@ jobs:
         run: pip install ruff
 
       - name: Lint with ruff
-        run: ruff check _lib/ --select E,F,W --ignore E501
+        run: |
+          ruff check _lib/ tests/ --select E,F,W --ignore E501
+          find . -path "./.git" -prune -o -path "./.pytest_cache" -prune -o -path "*/__pycache__" -prune -o -path "*/scripts/*.py" -print | xargs -r ruff check --select E,F,W --ignore E501
 
   validate-skills:
     name: Validate skill structure
@@ -59,10 +61,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install validation dependencies
+        run: pip install pytest
+
       - name: Validate all skills
         run: |
           python3 skill-creator/scripts/skill_creator.py list
-          for skill in time todo sync-git env-check notes prompt-lib memory git-summary project-brief daily-report ai-session-log skill-creator; do
+          for skill in */SKILL.md; do
+            skill="${skill%/SKILL.md}"
             echo "Validating $skill..."
-            python3 skill-creator/scripts/skill_creator.py validate "$skill" || true
+            python3 skill-creator/scripts/skill_creator.py validate "$skill"
           done

@@ -44,3 +44,21 @@ def test_parse_env_file(tmp_path, monkeypatch):
     env_loader._parse_env_file(env_file)
     assert os.environ.get("MY_TEST_VAR") == "test_value"
     assert os.environ.get("ANOTHER") == "123"
+
+
+def test_load_env_reloads_project_env_when_cwd_changes(tmp_path, monkeypatch):
+    project_a = tmp_path / "a"
+    project_b = tmp_path / "b"
+    project_a.mkdir()
+    project_b.mkdir()
+    (project_a / ".ai-skills.env").write_text("AI_PROVIDER=claude\n", encoding="utf-8")
+    (project_b / ".ai-skills.env").write_text("AI_PROVIDER=openai\n", encoding="utf-8")
+
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+    env_loader.reload_env()
+
+    monkeypatch.chdir(project_a)
+    assert env_loader.get("AI_PROVIDER") == "claude"
+
+    monkeypatch.chdir(project_b)
+    assert env_loader.get("AI_PROVIDER") == "openai"

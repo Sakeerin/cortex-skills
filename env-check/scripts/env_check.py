@@ -28,7 +28,7 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import load_env, get, get_data_dir
-from ai_provider import detect as detect_provider, SUPPORTED
+from ai_provider import detect as detect_provider, get_base_url, SUPPORTED
 
 # ---------------------------------------------------------------------------
 # Check helpers
@@ -152,7 +152,7 @@ def _check_gemini(show_fix: bool) -> None:
 
 
 def _check_ollama(show_fix: bool) -> None:
-    base_url = get("AI_BASE_URL", "http://localhost:11434")
+    base_url = get_base_url("ollama") or "http://localhost:11434"
     try:
         url = base_url.rstrip("/") + "/api/tags"
         with urllib.request.urlopen(url, timeout=3) as resp:
@@ -187,7 +187,7 @@ def _check_mistral(show_fix: bool) -> None:
 
 
 def _check_lmstudio(show_fix: bool) -> None:
-    base_url = get("AI_BASE_URL", "http://localhost:1234")
+    base_url = get_base_url("lmstudio") or "http://localhost:1234"
     try:
         url = base_url.rstrip("/") + "/v1/models"
         with urllib.request.urlopen(url, timeout=3) as resp:

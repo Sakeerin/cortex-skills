@@ -40,7 +40,7 @@ Complete installation and configuration guide for all supported AI providers.
 ### Option A — Interactive installer (recommended)
 
 ```bash
-git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+git clone https://github.com/Sakeerin/cortex-skills ~/.ai-skills
 bash ~/.ai-skills/install.sh
 ```
 
@@ -52,7 +52,7 @@ The installer will guide you through:
 ### Option B — Clone full repo manually
 
 ```bash
-git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+git clone https://github.com/Sakeerin/cortex-skills ~/.ai-skills
 ```
 
 Then configure manually (see [Provider Configuration](#provider-configuration) below).
@@ -60,7 +60,7 @@ Then configure manually (see [Provider Configuration](#provider-configuration) b
 ### Option C — Single skill via degit (no full clone)
 
 ```bash
-npx degit your-username/cortex-skills/todo ~/.ai-skills/todo
+npx degit Sakeerin/cortex-skills ~/.ai-skills
 ```
 
 ---

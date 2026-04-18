@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# install.sh — Interactive installer for cortex-skills
+# install.sh - Interactive installer for cortex-skills
 # Usage: bash install.sh [--all] [--skills skill1,skill2] [--dir DIR] [--no-path]
 set -euo pipefail
 
-REPO_URL="https://github.com/your-username/cortex-skills"
+REPO_URL="https://github.com/Sakeerin/cortex-skills"
+REPO_SLUG="Sakeerin/cortex-skills"
 DEFAULT_INSTALL_DIR="$HOME/.ai-skills"
 ENV_FILE="$HOME/.ai-skills.env"
 
 # Colors
 RED="\033[31m"; GREEN="\033[32m"; YELLOW="\033[33m"; CYAN="\033[36m"; BOLD="\033[1m"; RESET="\033[0m"
 
-info()    { echo -e "${CYAN}ℹ${RESET}  $*"; }
-success() { echo -e "${GREEN}✅${RESET} $*"; }
-warn()    { echo -e "${YELLOW}⚠️ ${RESET} $*"; }
-error()   { echo -e "${RED}❌${RESET} $*" >&2; }
-header()  { echo -e "\n${BOLD}$*${RESET}"; echo "$(printf '─%.0s' $(seq 1 ${#1}))"; }
+info()    { echo -e "${CYAN}i${RESET}  $*"; }
+success() { echo -e "${GREEN}OK${RESET} $*"; }
+warn()    { echo -e "${YELLOW}!!${RESET} $*"; }
+error()   { echo -e "${RED}ERR${RESET} $*" >&2; }
+header()  { echo -e "\n${BOLD}$*${RESET}"; printf '%*s\n' "${#1}" '' | tr ' ' '-'; }
 
 # All available skills
 ALL_SKILLS=(time todo sync-git env-check skill-creator ai-provider ai-context ai-model-list ai-cost token-budget notes prompt-lib memory git-summary project-brief daily-report ai-session-log)
@@ -47,14 +48,12 @@ done
 check_deps() {
     local missing=()
     command -v python3 &>/dev/null || command -v python &>/dev/null || missing+=("python3")
-    command -v git &>/dev/null || missing+=("git")
+    command -v git &>/dev/null || command -v npx &>/dev/null || missing+=("git or npx")
     if [[ ${#missing[@]} -gt 0 ]]; then
         error "Missing required tools: ${missing[*]}"
         error "Please install them and try again."
         exit 1
     fi
-    # Prefer python3, fallback to python
-    PYTHON=$(command -v python3 2>/dev/null || command -v python)
 }
 
 # ---------------------------------------------------------------------------
@@ -94,48 +93,72 @@ select_skills_interactive() {
 }
 
 # ---------------------------------------------------------------------------
-# Install a single skill
+# Repo install/update
 # ---------------------------------------------------------------------------
-install_skill() {
+clone_repo_to() {
+    local target="$1"
+    git clone --quiet --depth=1 "$REPO_URL" "$target" 2>/dev/null
+}
+
+degit_repo_to() {
+    local target="$1"
+    command -v npx &>/dev/null || return 1
+    npx --yes degit "$REPO_SLUG" "$target" --quiet 2>/dev/null
+}
+
+fetch_repo_to() {
+    local target="$1"
+    clone_repo_to "$target" || degit_repo_to "$target"
+}
+
+install_repo_runtime() {
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        info "Updating existing installation..."
+        git -C "$INSTALL_DIR" pull --ff-only --quiet 2>/dev/null || {
+            warn "git pull failed; keeping the existing checkout"
+            return 1
+        }
+        return 0
+    fi
+
+    if [[ ! -d "$INSTALL_DIR" ]] || [[ -z "$(find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
+        info "Installing cortex-skills runtime..."
+        rm -rf "$INSTALL_DIR"
+        fetch_repo_to "$INSTALL_DIR" || {
+            error "Could not fetch $REPO_URL"
+            return 1
+        }
+        return 0
+    fi
+
+    local temp_dir
+    temp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t cortex-skills)"
+    info "Refreshing existing non-git installation..."
+    fetch_repo_to "$temp_dir" || {
+        rm -rf "$temp_dir"
+        error "Could not fetch $REPO_URL"
+        return 1
+    }
+
+    cp -R "$temp_dir"/. "$INSTALL_DIR"/
+    rm -rf "$temp_dir"
+}
+
+prepare_skill() {
     local skill="$1"
     local dest="$INSTALL_DIR/$skill"
 
-    # Check if git is available and clone from repo
-    if command -v git &>/dev/null; then
-        if [[ -d "$dest" ]]; then
-            info "Updating $skill..."
-            git -C "$dest" pull --quiet 2>/dev/null || true
-        else
-            info "Installing $skill..."
-            git clone --quiet --depth=1 --filter=blob:none --sparse "$REPO_URL" "$dest.tmp" 2>/dev/null && \
-            git -C "$dest.tmp" sparse-checkout set "$skill" && \
-            mv "$dest.tmp/$skill" "$dest" && \
-            rm -rf "$dest.tmp" || {
-                # Fallback: try degit
-                if command -v npx &>/dev/null; then
-                    npx --yes degit "$REPO_URL/$skill" "$dest" --quiet 2>/dev/null
-                else
-                    warn "Cannot install $skill: git sparse-checkout failed and npx not available"
-                    return 1
-                fi
-            }
-        fi
-    elif command -v npx &>/dev/null; then
-        info "Installing $skill via degit..."
-        npx --yes degit "$REPO_URL/$skill" "$dest" --quiet 2>/dev/null
-    else
-        error "Neither git nor npx found. Cannot install skills."
-        exit 1
+    if [[ ! -d "$dest" ]]; then
+        warn "Skill not found in repo: $skill"
+        return 1
     fi
 
-    # Make wrapper executable
     local wrapper="$dest/$skill"
     [[ -f "$wrapper" ]] && chmod +x "$wrapper"
-    # Make Python scripts executable
     find "$dest/scripts" -name "*.py" -exec chmod +x {} \; 2>/dev/null || true
     find "$dest/scripts" -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 
-    success "Installed $skill → $dest"
+    success "Ready: $skill -> $dest"
 }
 
 # ---------------------------------------------------------------------------
@@ -211,9 +234,8 @@ configure_provider() {
         echo ""
     fi
 
-    # Write config
     {
-        echo "# cortex-skills config — $(date +%Y-%m-%d)"
+        echo "# cortex-skills config - $(date +%Y-%m-%d)"
         echo "AI_PROVIDER=$PROVIDER"
         echo "AI_MODEL=$MODEL"
         [[ -n "$API_KEY" ]] && echo "$KEY_VAR=$API_KEY"
@@ -239,10 +261,10 @@ setup_path() {
         shell_rc="$HOME/.bash_profile"
     fi
 
-    local path_snippet='# cortex-skills PATH
-for _d in "$HOME/.ai-skills"/*/; do
-  [[ -d "$_d" ]] && export PATH="$_d:$PATH"
-done'
+    local path_snippet="# cortex-skills PATH
+for _d in \"$INSTALL_DIR\"/*/; do
+  [[ -d \"\$_d\" ]] && export PATH=\"\$_d:\$PATH\"
+done"
 
     if [[ -n "$shell_rc" ]]; then
         if grep -q "cortex-skills PATH" "$shell_rc" 2>/dev/null; then
@@ -267,7 +289,6 @@ done'
 main() {
     check_deps
 
-    # Determine skills to install
     if [[ "$INSTALL_ALL" == "true" ]]; then
         SELECTED_SKILLS=("${ALL_SKILLS[@]}")
     elif [[ ${#SELECTED_SKILLS[@]} -eq 0 ]]; then
@@ -279,24 +300,23 @@ main() {
         exit 1
     fi
 
-    # Create install dir
     mkdir -p "$INSTALL_DIR"
     info "Installing to $INSTALL_DIR/"
     echo ""
 
-    # Install each skill
+    install_repo_runtime || exit 1
+
     local failed=()
     for skill in "${SELECTED_SKILLS[@]}"; do
-        install_skill "$skill" || failed+=("$skill")
+        prepare_skill "$skill" || failed+=("$skill")
     done
 
     echo ""
     header "Summary"
     local installed=$(( ${#SELECTED_SKILLS[@]} - ${#failed[@]} ))
-    success "Installed: $installed / ${#SELECTED_SKILLS[@]} skills"
-    [[ ${#failed[@]} -gt 0 ]] && warn "Failed: ${failed[*]}"
+    success "Ready: $installed / ${#SELECTED_SKILLS[@]} requested skills"
+    [[ ${#failed[@]} -gt 0 ]] && warn "Missing: ${failed[*]}"
 
-    # Configure provider (only if not silent/scripted)
     if [[ -t 0 ]]; then
         configure_provider
         setup_path
