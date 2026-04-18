@@ -52,7 +52,11 @@ def load_memory() -> dict:
             line = line.strip()
             if not line:
                 continue
-            obj = json.loads(line)
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
+                continue
             key = obj.get("key")
             if not key:
                 continue
@@ -87,9 +91,6 @@ def cmd_add(args):
         "created_at": entries[key].get("created_at", ts) if is_update else ts,
         "updated_at": ts,
     }
-    # Override tags if explicitly provided
-    if args.tag is not None:
-        event["tags"] = args.tag
     append_event(event)
     action = "Updated" if is_update else "Saved"
     print(f"{action} memory '{key}'")

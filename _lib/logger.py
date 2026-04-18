@@ -9,6 +9,12 @@ Usage:
 import sys
 import os
 
+# Ensure emoji display correctly on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 # Disable colors if not a TTY or NO_COLOR is set
 _USE_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
 

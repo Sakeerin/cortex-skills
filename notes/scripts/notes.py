@@ -53,7 +53,11 @@ def load_notes() -> dict:
             line = line.strip()
             if not line:
                 continue
-            obj = json.loads(line)
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
+                continue
             nid = obj.get("id")
             if not nid:
                 continue
@@ -72,6 +76,9 @@ def append_event(event: dict) -> None:
 
 
 def resolve_id(notes: dict, prefix: str) -> str:
+    if not prefix:
+        print("Note ID is required.", file=sys.stderr)
+        sys.exit(1)
     matches = [k for k in notes if k == prefix or k.startswith(prefix)]
     if not matches:
         print(f"Note not found: {prefix}", file=sys.stderr)

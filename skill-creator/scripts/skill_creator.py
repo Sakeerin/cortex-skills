@@ -172,28 +172,32 @@ def cmd_new(args):
     description = args.description or f"{name} skill"
     is_bash = args.bash
 
+    # Escape braces in user-supplied description so .format() won't
+    # raise KeyError if description contains literal { } characters.
+    safe_desc = description.replace("{", "{{").replace("}", "}}")
+
     # Create directories
     scripts_dir = skill_dir / "scripts"
     scripts_dir.mkdir(parents=True)
 
     # SKILL.md
     (skill_dir / "SKILL.md").write_text(
-        _SKILL_MD.format(name=name, description=description), encoding="utf-8"
+        _SKILL_MD.format(name=name, description=safe_desc), encoding="utf-8"
     )
 
     if is_bash:
         # Bash skill
         (scripts_dir / "main.sh").write_text(
-            _MAIN_SH.format(name=name, description=description), encoding="utf-8"
+            _MAIN_SH.format(name=name, description=safe_desc), encoding="utf-8"
         )
         wrapper = skill_dir / name
         wrapper.write_text(
-            _WRAPPER_BASH.format(name=name, description=description), encoding="utf-8"
+            _WRAPPER_BASH.format(name=name, description=safe_desc), encoding="utf-8"
         )
     else:
         # Python skill
         (scripts_dir / "main.py").write_text(
-            _MAIN_PY.format(name=name, description=description), encoding="utf-8"
+            _MAIN_PY.format(name=name, description=safe_desc), encoding="utf-8"
         )
         wrapper = skill_dir / name
         wrapper.write_text(_WRAPPER_SH, encoding="utf-8")

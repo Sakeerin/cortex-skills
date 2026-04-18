@@ -299,6 +299,11 @@ def main():
     args = parser.parse_args()
 
     if args.date:
+        try:
+            date.fromisoformat(args.date)  # validates YYYY-MM-DD format
+        except ValueError:
+            print(f"Invalid date '{args.date}'. Use YYYY-MM-DD format.", file=sys.stderr)
+            sys.exit(1)
         target_date = args.date
     elif args.yesterday:
         target_date = (date.today() - timedelta(days=1)).isoformat()

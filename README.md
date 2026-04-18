@@ -8,42 +8,30 @@ Provider-agnostic tools for developer workflows: task management, git sync, cost
 
 ## Quick Start
 
-### 1. Install a skill
-
 ```bash
-# Install a single skill via degit (no git clone needed)
-npx degit your-username/cortex-skills/todo ~/.ai-skills/todo
-
-# Or clone the full repo
 git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+bash ~/.ai-skills/install.sh
 ```
 
-### 2. Configure your provider
+Or manually in 3 steps:
 
 ```bash
-cat >> ~/.ai-skills.env << 'EOF'
+# 1. Clone
+git clone https://github.com/your-username/cortex-skills ~/.ai-skills
+
+# 2. Configure provider
+cat > ~/.ai-skills.env << 'EOF'
 AI_PROVIDER=claude
 AI_MODEL=claude-sonnet-4-6
 ANTHROPIC_API_KEY=sk-ant-...
 AI_SKILLS_DATA_DIR=~/.ai-skills-data
 EOF
-```
 
-### 3. Verify setup
-
-```bash
+# 3. Verify
 python3 ~/.ai-skills/env-check/scripts/env_check.py --fix
 ```
 
-### 4. (Optional) Add skills to PATH
-
-```bash
-# Add all skill wrappers to PATH
-for d in ~/.ai-skills/*/; do export PATH="$d:$PATH"; done
-
-# Or add to ~/.bashrc / ~/.zshrc permanently
-echo 'for d in ~/.ai-skills/*/; do export PATH="$d:$PATH"; done' >> ~/.zshrc
-```
+**Full setup guides:** [SETUP.md](SETUP.md) | [Windows](docs/setup-windows.md) | [Ollama/Local AI](docs/setup-ollama.md) | [Claude Code](CLAUDE.md)
 
 ---
 

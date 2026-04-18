@@ -58,7 +58,11 @@ def load_tasks() -> dict:
             line = line.strip()
             if not line:
                 continue
-            obj = json.loads(line)
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
+                continue
             tid = obj.get("id")
             if not tid:
                 continue
@@ -77,6 +81,9 @@ def append_event(event: dict) -> None:
 
 
 def resolve_id(tasks: dict, tid_prefix: str) -> str:
+    if not tid_prefix:
+        print("Task ID is required.", file=sys.stderr)
+        sys.exit(1)
     matches = [k for k in tasks if k == tid_prefix or k.startswith(tid_prefix)]
     if not matches:
         print(f"Task not found: {tid_prefix}", file=sys.stderr)

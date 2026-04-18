@@ -191,14 +191,7 @@ def main():
     )
     parser.add_argument("--provider", choices=["claude", "gemini"],
                         help="Filter by provider")
-
-    sub = parser.add_subparsers(dest="cmd")
-
-    p_latest = sub.add_parser("--latest", help="Show recent sessions")
-    p_latest.add_argument("--count", type=int, default=3)
-
-    # Top-level flags as pseudo-subcommands
-    parser.add_argument("--latest", action="store_true", help="Show recent sessions")
+    parser.add_argument("--latest", action="store_true", help="Show recent sessions (default)")
     parser.add_argument("--count", type=int, default=3, help="Number of sessions (with --latest)")
     parser.add_argument("--search", metavar="KEYWORD", help="Search session content")
     parser.add_argument("--export", choices=["markdown"], metavar="FORMAT",
