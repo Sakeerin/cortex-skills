@@ -33,6 +33,7 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import get_data_dir
+from jsonl_store import JSONLStore
 
 VALID_PRIORITIES = ["low", "medium", "high", "urgent"]
 PRIORITY_ORDER = {"urgent": 0, "high": 1, "medium": 2, "low": 3}
@@ -47,37 +48,17 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat()
 
 
+def _store() -> JSONLStore:
+    return JSONLStore(get_tasks_file())
+
+
 def load_tasks() -> dict:
     """Reconstruct current task state from JSONL event log."""
-    path = get_tasks_file()
-    if not path.exists():
-        return {}
-    tasks = {}
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
-                continue
-            tid = obj.get("id")
-            if not tid:
-                continue
-            if obj.get("deleted"):
-                tasks.pop(tid, None)
-            else:
-                tasks[tid] = {**tasks.get(tid, {}), **obj}
-    return tasks
+    return _store().load()
 
 
 def append_event(event: dict) -> None:
-    path = get_tasks_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    _store().append(event)
 
 
 def resolve_id(tasks: dict, tid_prefix: str) -> str:

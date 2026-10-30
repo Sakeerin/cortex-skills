@@ -31,6 +31,7 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import get_data_dir
+from jsonl_store import JSONLStore
 
 
 def get_memory_file() -> Path:
@@ -41,37 +42,18 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat()
 
 
+def _store() -> JSONLStore:
+    # Memory uses "key" as the unique identifier (not "id")
+    return JSONLStore(get_memory_file(), id_key="key")
+
+
 def load_memory() -> dict:
     """Load memory keyed by `key` (last write wins)."""
-    path = get_memory_file()
-    if not path.exists():
-        return {}
-    entries = {}
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
-                continue
-            key = obj.get("key")
-            if not key:
-                continue
-            if obj.get("deleted"):
-                entries.pop(key, None)
-            else:
-                entries[key] = {**entries.get(key, {}), **obj}
-    return entries
+    return _store().load()
 
 
 def append_event(event: dict) -> None:
-    path = get_memory_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    _store().append(event)
 
 
 # ---------------------------------------------------------------------------

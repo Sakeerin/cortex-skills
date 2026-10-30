@@ -80,7 +80,7 @@ Run: python3 ~/.ai-skills/<skill>/scripts/main.py <command>
 
 ### Any AI Agent
 
-Run `python3 ~/.ai-skills/project-brief/scripts/main.py inject` *(Phase 3)* to generate a context block you can paste into any system prompt.
+Run `python3 ~/.ai-skills/project-brief/scripts/project_brief.py inject` to generate a context block you can paste into any system prompt.
 
 ---
 
@@ -163,7 +163,9 @@ All skill data is stored at `~/.ai-skills-data/` (configurable via `AI_SKILLS_DA
 └── cost-log.jsonl      # AI cost tracking
 ```
 
-Uses append-only **JSONL** format — no database required.
+Uses append-only **JSONL** format with automatic compaction — no database required.
+
+**More docs:** [Architecture](docs/ARCHITECTURE.md) | [Troubleshooting](docs/TROUBLESHOOTING.md) | [Contributing](CONTRIBUTING.md)
 
 ---
 

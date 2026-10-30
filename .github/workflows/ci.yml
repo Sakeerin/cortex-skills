@@ -44,10 +44,21 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Lint with ruff
+      - name: Lint Python with ruff
         run: |
-          ruff check _lib/ tests/ --select E,F,W --ignore E501
-          find . -path "./.git" -prune -o -path "./.pytest_cache" -prune -o -path "*/__pycache__" -prune -o -path "*/scripts/*.py" -print | xargs -r ruff check --select E,F,W --ignore E501
+          ruff check . \
+            --select E,F,W \
+            --ignore E501 \
+            --exclude .git,__pycache__,.pytest_cache,_templates
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts with shellcheck
+        run: |
+          shellcheck install.sh
+          shellcheck sync-git/scripts/sync.sh
+          find . -name "*.sh" -not -path "./.git/*" | xargs shellcheck --severity=warning
 
   validate-skills:
     name: Validate skill structure

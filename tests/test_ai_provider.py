@@ -49,7 +49,8 @@ def test_set_provider_writes_provider_specific_base_url_key(tmp_path, monkeypatc
     assert "AI_PROVIDER=openai" in contents
     assert "AI_MODEL=gpt-4o" in contents
     assert "OPENAI_BASE_URL=https://openai.example/v1" in contents
-    assert "AI_BASE_URL=" not in contents
+    # Use line-start check to avoid false match on "OPENAI_BASE_URL=" containing "AI_BASE_URL="
+    assert not any(line.startswith("AI_BASE_URL=") for line in contents.splitlines())
 
 
 def test_set_provider_uses_local_provider_specific_key(tmp_path, monkeypatch):

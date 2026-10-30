@@ -29,6 +29,7 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import get_data_dir
+from jsonl_store import JSONLStore
 
 
 def get_notes_file() -> Path:
@@ -43,36 +44,16 @@ def today_str() -> str:
     return date.today().isoformat()
 
 
+def _store() -> JSONLStore:
+    return JSONLStore(get_notes_file())
+
+
 def load_notes() -> dict:
-    path = get_notes_file()
-    if not path.exists():
-        return {}
-    notes = {}
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                print(f"Warning: skipping corrupted line in {path.name}", file=sys.stderr)
-                continue
-            nid = obj.get("id")
-            if not nid:
-                continue
-            if obj.get("deleted"):
-                notes.pop(nid, None)
-            else:
-                notes[nid] = {**notes.get(nid, {}), **obj}
-    return notes
+    return _store().load()
 
 
 def append_event(event: dict) -> None:
-    path = get_notes_file()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    _store().append(event)
 
 
 def resolve_id(notes: dict, prefix: str) -> str:
