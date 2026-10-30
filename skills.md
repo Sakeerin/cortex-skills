@@ -27,6 +27,10 @@ Skills ทั้งหมดรับ `--help` เพื่อดูคำสั
 
 ### AI Provider Layer
 
+New: [ai-data](ai-data/SKILL.md) provides `backup`, `restore`, and `doctor --repair`.
+`ai-cost` now imports recorded Claude/Gemini usage automatically before reports; see
+[usage import](docs/usage-import.md). Preview with `ai-cost import --dry-run`.
+
 | Skill | วัตถุประสงค์ | สถานะ |
 |---|---|---|
 | [ai-provider](#ai-provider) | ตรวจจับและ configure AI provider | 🔧 phase 2 |

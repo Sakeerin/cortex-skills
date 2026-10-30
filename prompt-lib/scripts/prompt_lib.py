@@ -34,6 +34,7 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import get_data_dir
+from file_lock import atomic_write, data_lock
 
 _VAR_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 
@@ -57,8 +58,8 @@ def load_prompts() -> dict:
 def save_prompts(prompts: dict) -> None:
     path = get_prompts_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(prompts, f, ensure_ascii=False, indent=2)
+    with data_lock(path.parent):
+        atomic_write(path, json.dumps(prompts, ensure_ascii=False, indent=2).encode('utf-8'))
 
 
 def extract_vars(text: str) -> list[str]:

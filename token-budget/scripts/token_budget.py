@@ -19,7 +19,8 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from cost_tracker import CostTracker
+from cost_tracker import CostTracker  # noqa: E402
+from usage_importer import sync_usage  # noqa: E402
 
 BUDGET_TYPES = ("daily", "session", "monthly")
 
@@ -38,6 +39,9 @@ def cmd_set(args) -> None:
 
 def cmd_status(_args) -> None:
     tracker = CostTracker()
+    sync_usage(tracker)
+    if any(event.get('cost_usd') is None for event in tracker.load_events()):
+        print('Warning: usage with unknown prices is excluded from budget totals.', file=sys.stderr)
     budgets = tracker.get_budgets()
     print("Token Budget Status")
     print("-" * 60)

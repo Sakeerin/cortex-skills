@@ -51,6 +51,8 @@ python3 ~/.ai-skills/env-check/scripts/env_check.py --fix
 | `daily-report` | Generate daily standup from todos + git + notes | `daily-report` |
 | `ai-session-log` | Browse and search Claude/Gemini session history | `ai-session-log --latest --count 5` |
 | `skill-creator` | Scaffold and validate new skills | `skill-creator new my-skill` |
+| `ai-data` | Back up, restore, and diagnose skill data | `ai-data doctor` |
+| `ai-cost` | Automatically import recorded Claude/Gemini usage and report estimates | `ai-cost today` |
 
 See [skills.md](skills.md) for the full catalog with data paths and compatibility matrix.
 
@@ -170,6 +172,25 @@ Uses append-only **JSONL** format with automatic compaction — no database requ
 ---
 
 ## Configuration
+
+Data maintenance and automatic usage import:
+
+```bash
+ai-data backup
+ai-data doctor
+ai-data doctor --repair
+ai-data restore ./skills-backup.zip --dry-run
+ai-data restore ./skills-backup.zip --overwrite
+ai-cost import --dry-run
+ai-cost today
+ai-cost today --no-import
+```
+
+Repair quarantines invalid JSONL lines and preserves a safety backup. Overwrite restore
+also backs up existing data, after verifying archive paths and checksums.
+See [ai-data](ai-data/SKILL.md) and [usage import](docs/usage-import.md) for details.
+Source transcripts are read-only. Unknown prices are reported explicitly instead of counted as free.
+Set `AI_USAGE_AUTO_IMPORT=0` to disable automatic imports.
 
 `~/.ai-skills.env` (or `.ai-skills.env` in any project directory):
 

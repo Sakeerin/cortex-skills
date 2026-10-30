@@ -18,7 +18,7 @@ error()   { echo -e "${RED}ERR${RESET} $*" >&2; }
 header()  { echo -e "\n${BOLD}$*${RESET}"; printf '%*s\n' "${#1}" '' | tr ' ' '-'; }
 
 # All available skills
-ALL_SKILLS=(time todo sync-git env-check skill-creator ai-provider ai-context ai-model-list ai-cost token-budget notes prompt-lib memory git-summary project-brief daily-report ai-session-log)
+ALL_SKILLS=(time todo sync-git env-check skill-creator ai-provider ai-context ai-model-list ai-cost token-budget notes prompt-lib memory git-summary project-brief daily-report ai-session-log ai-data)
 
 INSTALL_DIR="$DEFAULT_INSTALL_DIR"
 INSTALL_ALL=false

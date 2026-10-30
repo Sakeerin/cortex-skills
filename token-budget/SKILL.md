@@ -23,3 +23,6 @@ token-budget alert --threshold 80
 
 - Budget data is stored in `~/.ai-skills-data/budget.json`.
 - `session` reset clears the accumulated session spend without deleting the configured limit.
+- `status` imports available Claude/Gemini usage before checking daily/monthly totals.
+  Set `AI_USAGE_AUTO_IMPORT=0` for read-only status. Historical imports do not increment
+  the live session counter; records with unknown prices are excluded with a warning.

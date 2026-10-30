@@ -19,6 +19,7 @@ if str(LIB_DIR) not in sys.path:
 def data_dir(tmp_path, monkeypatch):
     """Isolate skill data to a temp directory for each test."""
     monkeypatch.setenv("AI_SKILLS_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv('AI_USAGE_AUTO_IMPORT', '0')
     # Reset env_loader cache so it picks up the new env var
     import env_loader
     env_loader._loaded = False

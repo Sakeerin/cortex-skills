@@ -31,6 +31,8 @@ if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
 from env_loader import get_data_dir, get
+from cost_tracker import CostTracker  # noqa: E402
+from usage_importer import sync_usage  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +114,7 @@ def collect_commits(target_date: str) -> list[str]:
 def collect_ai_cost(target_date: str) -> tuple[float, int, str]:
     """Return (total_cost_usd, total_tokens, provider_model) for target_date."""
     data = get_data_dir()
+    sync_usage(CostTracker(data))
     cost_file = data / "cost-log.jsonl"
     if not cost_file.exists():
         return 0.0, 0, ""
@@ -130,7 +133,10 @@ def collect_ai_cost(target_date: str) -> tuple[float, int, str]:
             except json.JSONDecodeError:
                 continue
             if (obj.get("timestamp") or "")[:10] == target_date:
-                total_cost += obj.get("cost_usd", 0)
+                if obj.get('cost_usd') is None:
+                    print('Warning: imported usage with unknown price is excluded from cost totals.',
+                          file=sys.stderr)
+                total_cost += obj.get("cost_usd") or 0
                 tokens = obj.get("input_tokens", 0) + obj.get("output_tokens", 0)
                 total_tokens += tokens
                 model_key = f"{obj.get('provider','?')}/{obj.get('model','?')}"

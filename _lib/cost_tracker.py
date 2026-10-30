@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from ai_provider import get_data_dir
+from file_lock import atomic_write, data_lock
 
 DEFAULT_RATES = {
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
@@ -62,6 +64,9 @@ class CostTracker:
                             "input": float(model_rates.get("input", 0.0)),
                             "output": float(model_rates.get("output", 0.0)),
                         }
+                        for key in ('cache_read', 'cache_write'):
+                            if key in model_rates:
+                                rates[model.lower()][key] = float(model_rates[key])
             except (json.JSONDecodeError, ValueError):
                 pass
 
@@ -79,10 +84,17 @@ class CostTracker:
         rates = self.load_rates()
         if model_key in rates:
             return rates[model_key]
-        for known, value in rates.items():
-            if model_key.startswith(known):
-                return value
+        for known in sorted(rates, key=len, reverse=True):
+            if model_key.startswith(known + '-') or model_key.startswith(known + ':'):
+                return rates[known]
         return {"input": 0.0, "output": 0.0}
+
+    def has_rate(self, model: str, provider: str) -> bool:
+        if provider in {'ollama', 'lmstudio'}:
+            return True
+        model = model.lower()
+        return any(model == key or model.startswith(key + '-') or model.startswith(key + ':')
+                   for key in self.load_rates())
 
     def estimate_cost(
         self,
@@ -124,15 +136,21 @@ class CostTracker:
             "session_id": session_id or "default",
             "metadata": metadata or {},
         }
-        with self.log_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
-
-        if self._events_cache is not None:
-            self._events_cache.append(event)
-            self._events_signature = self._file_signature(self.log_path)
-
-        self._increment_session_spend(cost_usd)
+        with data_lock(self.data_dir):
+            with self.log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+            self.invalidate_events()
+            self._increment_session_spend(cost_usd)
         return event
+
+    def invalidate_events(self) -> None:
+        self._events_cache = None
+        self._events_signature = None
+
+    @staticmethod
+    def event_cost(event: dict) -> float:
+        value = event.get('cost_usd')
+        return float(value) if isinstance(value, (int, float)) and math.isfinite(value) else 0.0
 
     def load_events(self) -> list[dict[str, object]]:
         signature = self._file_signature(self.log_path)
@@ -161,7 +179,7 @@ class CostTracker:
 
     def get_daily_cost(self, target_date: date | None = None) -> float:
         target_date = target_date or datetime.now().astimezone().date()
-        return round(sum(event["cost_usd"] for event in self._events_for_day(target_date)), 6)
+        return round(sum(self.event_cost(event) for event in self._events_for_day(target_date)), 6)
 
     def get_weekly_cost(self, target_date: date | None = None) -> float:
         target_date = target_date or datetime.now().astimezone().date()
@@ -169,7 +187,7 @@ class CostTracker:
         week_end = week_start + timedelta(days=6)
         return round(
             sum(
-                event["cost_usd"]
+                self.event_cost(event)
                 for event in self.load_events()
                 if week_start <= self._event_date(event) <= week_end
             ),
@@ -180,7 +198,7 @@ class CostTracker:
         target_date = target_date or datetime.now().astimezone().date()
         return round(
             sum(
-                event["cost_usd"]
+                self.event_cost(event)
                 for event in self.load_events()
                 if self._event_date(event).year == target_date.year
                 and self._event_date(event).month == target_date.month
@@ -194,12 +212,14 @@ class CostTracker:
             key = (event.get("provider", "unknown"), event.get("model", "unknown"))
             bucket = breakdown.setdefault(
                 key,
-                {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_usd": 0.0},
+                {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+                 "cost_usd": 0.0, "unpriced_events": 0},
             )
             bucket["input_tokens"] += int(event.get("input_tokens", 0))
             bucket["output_tokens"] += int(event.get("output_tokens", 0))
             bucket["total_tokens"] += int(event.get("total_tokens", 0))
-            bucket["cost_usd"] += float(event.get("cost_usd", 0.0))
+            bucket["cost_usd"] += self.event_cost(event)
+            bucket["unpriced_events"] += event.get('cost_usd') is None
         for bucket in breakdown.values():
             bucket["cost_usd"] = round(bucket["cost_usd"], 6)
         return breakdown
@@ -256,9 +276,10 @@ class CostTracker:
         return dict(budgets)
 
     def save_budgets(self, budgets: dict[str, object]) -> None:
-        self.budget_path.write_text(json.dumps(budgets, indent=2), encoding="utf-8")
-        self._budgets_cache = dict(budgets)
-        self._budgets_signature = self._file_signature(self.budget_path)
+        with data_lock(self.data_dir):
+            atomic_write(self.budget_path, json.dumps(budgets, indent=2).encode('utf-8'))
+            self._budgets_cache = dict(budgets)
+            self._budgets_signature = self._file_signature(self.budget_path)
 
     def set_budget(self, budget_type: str, amount: float) -> dict[str, object]:
         budgets = self.get_budgets()

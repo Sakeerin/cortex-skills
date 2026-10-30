@@ -18,6 +18,8 @@ import json
 import sys
 from pathlib import Path
 
+from file_lock import atomic_write, data_lock
+
 
 class JSONLStore:
     """
@@ -93,9 +95,10 @@ class JSONLStore:
         Triggers auto-compaction if the file has grown too large.
         """
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event, ensure_ascii=False) + "\n")
-        self._maybe_compact()
+        with data_lock(self.path.parent):
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            self._maybe_compact()
 
     def compact(self) -> int:
         """
@@ -110,21 +113,13 @@ class JSONLStore:
         if not self.path.exists():
             return 0
 
-        state = self.load()
-        old_count = self._count_lines()
-
-        tmp = self.path.with_suffix(".tmp")
-        try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                for record in state.values():
-                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            tmp.replace(self.path)
-        except Exception:
-            tmp.unlink(missing_ok=True)
-            raise
-
-        removed = old_count - len(state)
-        return removed
+        with data_lock(self.path.parent):
+            state = self.load()
+            old_count = self._count_lines()
+            content = ''.join(json.dumps(record, ensure_ascii=False) + '\n'
+                              for record in state.values())
+            atomic_write(self.path, content.encode('utf-8'))
+            return old_count - len(state)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -146,6 +141,5 @@ class JSONLStore:
         total = self._count_lines()
         if total < self._COMPACT_THRESHOLD:
             return
-        # Avoid a full load just to check ratio; compact unconditionally
-        # once past the threshold.
-        self.compact()
+        if total >= max(len(self.load()), 1) * self._COMPACT_RATIO:
+            self.compact()
