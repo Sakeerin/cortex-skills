@@ -14,6 +14,9 @@ from pathlib import Path
 
 from ai_provider import get_data_dir
 from file_lock import atomic_write, data_lock
+from data_scope import current_scope
+from errors import DataError
+from data_manager import validate_document
 
 DEFAULT_RATES = {
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
@@ -37,6 +40,7 @@ def now_iso() -> str:
 
 class CostTracker:
     def __init__(self, data_dir: Path | None = None):
+        self.scope = current_scope()
         self.data_dir = data_dir or get_data_dir()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.data_dir / "cost-log.jsonl"
@@ -123,6 +127,13 @@ class CostTracker:
     ) -> dict[str, object]:
         input_tokens = int(input_tokens)
         output_tokens = int(output_tokens)
+        if input_tokens < 0 or output_tokens < 0:
+            raise ValueError('Token counts must be nonnegative')
+        scope = self.scope
+        if scope.kind == 'session':
+            if session_id is not None and session_id != scope.session:
+                raise ValueError('--session-id must match the selected session scope')
+            session_id = scope.session
         cost_usd = self.estimate_cost(provider, model, input_tokens, output_tokens)
         event = {
             "id": str(uuid.uuid4()),
@@ -137,6 +148,9 @@ class CostTracker:
             "metadata": metadata or {},
         }
         with data_lock(self.data_dir):
+            # Validate budget data before appending, so a corrupt budget cannot
+            # turn a rejected command into an unreported usage write.
+            self.get_budgets()
             with self.log_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event, ensure_ascii=False) + "\n")
             self.invalidate_events()
@@ -259,16 +273,17 @@ class CostTracker:
                 "session_spend": 0.0,
             }
         else:
-            try:
-                data = json.loads(self.budget_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                data = {}
+            data = json.loads(self.budget_path.read_text(encoding="utf-8"))
+            error = validate_document('budget.json', data)
+            if error:
+                raise DataError(f'Invalid budget data: {error}; run ai-data doctor')
             budgets = {
                 "daily": data.get("daily"),
                 "session": data.get("session"),
                 "monthly": data.get("monthly"),
                 "alert_threshold": data.get("alert_threshold", 80),
                 "session_spend": float(data.get("session_spend", 0.0)),
+                "session_baseline": float(data.get('session_baseline', 0.0)),
             }
 
         self._budgets_cache = dict(budgets)
@@ -282,12 +297,18 @@ class CostTracker:
             self._budgets_signature = self._file_signature(self.budget_path)
 
     def set_budget(self, budget_type: str, amount: float) -> dict[str, object]:
+        if budget_type not in {'daily', 'session', 'monthly'}:
+            raise ValueError(f'Unsupported budget type: {budget_type}')
+        if not math.isfinite(float(amount)) or amount < 0:
+            raise ValueError('Budget must be a finite, nonnegative amount')
         budgets = self.get_budgets()
         budgets[budget_type] = round(float(amount), 2)
         self.save_budgets(budgets)
         return budgets
 
     def set_alert_threshold(self, threshold: int) -> dict[str, object]:
+        if not 0 <= threshold <= 100:
+            raise ValueError('Alert threshold must be between 0 and 100')
         budgets = self.get_budgets()
         budgets["alert_threshold"] = int(threshold)
         self.save_budgets(budgets)
@@ -297,6 +318,8 @@ class CostTracker:
         budgets = self.get_budgets()
         if budget_type == "session":
             budgets["session_spend"] = 0.0
+            if self.scope.kind == 'session':
+                budgets['session_baseline'] = self._session_total()
         else:
             budgets[budget_type] = None
         self.save_budgets(budgets)
@@ -310,7 +333,8 @@ class CostTracker:
         elif budget_type == "monthly":
             used = self.get_monthly_cost()
         elif budget_type == "session":
-            used = float(budgets.get("session_spend", 0.0))
+            used = (max(self._session_total() - float(budgets.get('session_baseline', 0.0)), 0.0)
+                    if self.scope.kind == 'session' else float(budgets.get('session_spend', 0.0)))
         else:
             raise ValueError(f"Unsupported budget type: {budget_type}")
         exceeded = limit is not None and used > float(limit)
@@ -320,6 +344,10 @@ class CostTracker:
         budgets = self.get_budgets()
         budgets["session_spend"] = round(float(budgets.get("session_spend", 0.0)) + amount, 6)
         self.save_budgets(budgets)
+
+    def _session_total(self) -> float:
+        return sum(self.event_cost(event) for event in self.load_events()
+                   if event.get('session_id') == self.scope.session)
 
     def _events_for_day(self, target_date: date) -> list[dict[str, object]]:
         return [event for event in self.load_events() if self._event_date(event) == target_date]

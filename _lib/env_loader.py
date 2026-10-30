@@ -121,9 +121,11 @@ def require(key: str) -> str:
 
 
 def get_data_dir() -> Path:
-    """Return the AI Skills data directory, creating it if needed."""
+    """Return the selected storage namespace (global by default)."""
+    from data_scope import current_scope
+
     raw = get("AI_SKILLS_DATA_DIR", str(Path.home() / ".ai-skills-data"))
-    path = Path(raw).expanduser()
+    path = current_scope().directory(Path(raw).expanduser())
     path.mkdir(parents=True, exist_ok=True)
     return path
 

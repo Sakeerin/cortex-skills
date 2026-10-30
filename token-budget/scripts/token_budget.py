@@ -21,6 +21,7 @@ if str(_LIB_DIR) not in sys.path:
 
 from cost_tracker import CostTracker  # noqa: E402
 from usage_importer import sync_usage  # noqa: E402
+from cli import command, set_result  # noqa: E402
 
 BUDGET_TYPES = ("daily", "session", "monthly")
 
@@ -34,6 +35,7 @@ def _format_money(value: float | None) -> str:
 def cmd_set(args) -> None:
     tracker = CostTracker()
     tracker.set_budget(args.kind, args.amount)
+    set_result(tracker.get_budgets())
     print(f"Set {args.kind} budget to {_format_money(args.amount)}")
 
 
@@ -43,6 +45,7 @@ def cmd_status(_args) -> None:
     if any(event.get('cost_usd') is None for event in tracker.load_events()):
         print('Warning: usage with unknown prices is excluded from budget totals.', file=sys.stderr)
     budgets = tracker.get_budgets()
+    status = {'budgets': [], 'alert_threshold': budgets.get('alert_threshold', 80)}
     print("Token Budget Status")
     print("-" * 60)
     for kind in BUDGET_TYPES:
@@ -52,17 +55,21 @@ def cmd_status(_args) -> None:
         alert = "alert" if limit and pct >= threshold else "ok"
         if exceeded:
             alert = "exceeded"
+        status['budgets'].append({'kind': kind, 'used': used, 'limit': limit,
+                                  'exceeded': exceeded, 'percent': pct, 'state': alert})
         suffix = f" ({pct:.1f}%)" if limit else ""
         print(
             f"{kind:<8} used:{_format_money(used):<12} "
             f"limit:{_format_money(limit):<12} state:{alert}{suffix}"
         )
     print(f"Alert threshold: {budgets.get('alert_threshold', 80)}%")
+    set_result(status)
 
 
 def cmd_reset(args) -> None:
     tracker = CostTracker()
     tracker.reset_budget(args.kind)
+    set_result(tracker.get_budgets())
     if args.kind == "session":
         print("Reset session spend to $0.0000")
     else:
@@ -72,6 +79,7 @@ def cmd_reset(args) -> None:
 def cmd_alert(args) -> None:
     tracker = CostTracker()
     tracker.set_alert_threshold(args.threshold)
+    set_result(tracker.get_budgets())
     print(f"Alert threshold set to {args.threshold}%")
 
 
@@ -96,6 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@command(scoped=True)
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -103,4 +112,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

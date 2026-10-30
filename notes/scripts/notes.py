@@ -28,8 +28,9 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import get_data_dir
-from jsonl_store import JSONLStore
+from env_loader import get_data_dir  # noqa: E402
+from jsonl_store import JSONLStore  # noqa: E402
+from cli import command, set_result, CLIError, NOT_FOUND, CONFLICT, USAGE  # noqa: E402
 
 
 def get_notes_file() -> Path:
@@ -58,15 +59,12 @@ def append_event(event: dict) -> None:
 
 def resolve_id(notes: dict, prefix: str) -> str:
     if not prefix:
-        print("Note ID is required.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError('Note ID is required.', USAGE)
     matches = [k for k in notes if k == prefix or k.startswith(prefix)]
     if not matches:
-        print(f"Note not found: {prefix}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'Note not found: {prefix}', NOT_FOUND)
     if len(matches) > 1:
-        print(f"Ambiguous prefix '{prefix}': {[m[:8] for m in matches]}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'Ambiguous prefix: {prefix}', CONFLICT)
     return matches[0]
 
 
@@ -87,6 +85,7 @@ def cmd_add(args):
         "updated_at": ts,
     }
     append_event(event)
+    set_result(event)
     tags_str = " ".join(f"#{t}" for t in (args.tag or []))
     print(f"Note added {nid[:8]}: {args.text}" + (f"  {tags_str}" if tags_str else ""))
 
@@ -103,6 +102,7 @@ def cmd_list(args):
         # Default: today's open notes
         items = [n for n in items if n.get("date") == today_str() and not n.get("done")]
 
+    set_result(items)
     if not items:
         if args.all:
             print("No notes found.")
@@ -127,6 +127,7 @@ def cmd_search(args):
         if keyword in n.get("content", "").lower()
         or keyword in " ".join(n.get("tags") or []).lower()
     ]
+    set_result(matches)
     if not matches:
         print(f"No notes matching '{args.keyword}'.")
         return
@@ -142,6 +143,7 @@ def cmd_done(args):
     notes = load_notes()
     nid = resolve_id(notes, args.id)
     append_event({"id": nid, "done": True, "updated_at": now_iso()})
+    set_result(load_notes()[nid])
     print(f"Done ✅ {nid[:8]}: {notes[nid]['content']}")
 
 
@@ -149,6 +151,7 @@ def cmd_delete(args):
     notes = load_notes()
     nid = resolve_id(notes, args.id)
     append_event({"id": nid, "deleted": True, "updated_at": now_iso()})
+    set_result({'id': nid, 'deleted': True})
     print(f"Deleted {nid[:8]}: {notes[nid]['content']}")
 
 
@@ -156,6 +159,7 @@ def cmd_export(args):
     notes = load_notes()
     items = list(notes.values())
     items.sort(key=lambda n: (n.get("date", ""), n.get("created_at", "")))
+    set_result(items)
 
     if args.format == "markdown":
         today = datetime.now().strftime("%Y-%m-%d")
@@ -182,6 +186,7 @@ def cmd_export(args):
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(description="Quick note-taking for coding sessions")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -215,4 +220,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

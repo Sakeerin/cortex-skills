@@ -26,6 +26,7 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
+from cli import command, set_result, CLIError, UNAVAILABLE  # noqa: E402
 
 def run_git(*args, check=True) -> str:
     try:
@@ -34,13 +35,13 @@ def run_git(*args, check=True) -> str:
             capture_output=True, text=True, encoding="utf-8",
             errors="replace", check=check,
         )
+        if result.returncode:
+            raise CLIError(f'git error: {result.stderr.strip()}')
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"git error: {e.stderr.strip()}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'git error: {e.stderr.strip()}') from e
     except FileNotFoundError:
-        print("git not found. Please install git.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError('git not found. Please install git.', UNAVAILABLE)
 
 
 def parse_stat_line(line: str) -> tuple[str, int, int]:
@@ -130,6 +131,9 @@ def get_log_entries(log_args: list[str]) -> list[dict]:
 
 def summarize_diff(diff_args: list[str], label: str, fmt: str):
     stats = get_diff_numstat(diff_args)
+    set_result({'label': label, 'files': [{'path': path, 'additions': adds, 'deletions': dels}
+                                        for path, adds, dels in stats],
+                'additions': sum(a for _, a, _ in stats), 'deletions': sum(d for _, _, d in stats)})
 
     if fmt == "prompt":
         if not stats:
@@ -138,7 +142,7 @@ def summarize_diff(diff_args: list[str], label: str, fmt: str):
         total_files = len(stats)
         total_adds = sum(a for _, a, _ in stats)
         total_dels = sum(d for _, _, d in stats)
-        print(f"Please write a conventional commit message for these changes:\n")
+        print("Please write a conventional commit message for these changes:\n")
         print(f"Files changed ({total_files}):")
         for fname, adds, dels in stats:
             parts = []
@@ -161,6 +165,7 @@ def summarize_diff(diff_args: list[str], label: str, fmt: str):
 
 def summarize_log(log_args: list[str], fmt: str):
     entries = get_log_entries(log_args)
+    set_result(entries)
 
     if not entries:
         print("No commits found.")
@@ -180,6 +185,7 @@ def summarize_log(log_args: list[str], fmt: str):
 # CLI
 # ---------------------------------------------------------------------------
 
+@command()
 def main():
     parser = argparse.ArgumentParser(
         description="Human-readable git diff/log summary",
@@ -215,4 +221,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

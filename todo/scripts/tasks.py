@@ -32,8 +32,9 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"                 # todo/ -> repo-root/ -> _
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import get_data_dir
-from jsonl_store import JSONLStore
+from env_loader import get_data_dir  # noqa: E402
+from jsonl_store import JSONLStore  # noqa: E402
+from cli import command, set_result, CLIError, NOT_FOUND, CONFLICT, USAGE  # noqa: E402
 
 VALID_PRIORITIES = ["low", "medium", "high", "urgent"]
 PRIORITY_ORDER = {"urgent": 0, "high": 1, "medium": 2, "low": 3}
@@ -63,15 +64,12 @@ def append_event(event: dict) -> None:
 
 def resolve_id(tasks: dict, tid_prefix: str) -> str:
     if not tid_prefix:
-        print("Task ID is required.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError('Task ID is required.', USAGE)
     matches = [k for k in tasks if k == tid_prefix or k.startswith(tid_prefix)]
     if not matches:
-        print(f"Task not found: {tid_prefix}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'Task not found: {tid_prefix}', NOT_FOUND)
     if len(matches) > 1:
-        print(f"Ambiguous ID prefix '{tid_prefix}', matches: {[m[:8] for m in matches]}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'Ambiguous ID prefix: {tid_prefix}', CONFLICT)
     return matches[0]
 
 
@@ -95,6 +93,7 @@ def cmd_list(args):
     elif not args.all:
         items = [t for t in items if not t.get("checked")]
 
+    set_result(items)
     if not items:
         print("No tasks found.")
         return
@@ -135,6 +134,7 @@ def cmd_add(args):
         "updated_at": ts,
     }
     append_event(event)
+    set_result(event)
     icon = PRIORITY_ICONS.get(priority, "⚪")
     print(f"Added {icon} {tid[:8]}: {args.title}")
 
@@ -161,6 +161,7 @@ def cmd_update(args):
         event["checked"] = args.checked.lower() in ("true", "1", "yes")
 
     append_event(event)
+    set_result({**tasks[tid], **event})
     print(f"Updated task {tid[:8]}")
 
 
@@ -168,6 +169,7 @@ def cmd_done(args):
     tasks = load_tasks()
     tid = resolve_id(tasks, args.id)
     append_event({"id": tid, "checked": True, "updated_at": now_iso()})
+    set_result(load_tasks()[tid])
     print(f"Done ✅ {tid[:8]}: {tasks[tid]['title']}")
 
 
@@ -175,17 +177,20 @@ def cmd_delete(args):
     tasks = load_tasks()
     tid = resolve_id(tasks, args.id)
     append_event({"id": tid, "deleted": True, "updated_at": now_iso()})
+    set_result({'id': tid, 'deleted': True})
     print(f"Deleted {tid[:8]}: {tasks[tid]['title']}")
 
 
 def cmd_get(args):
     tasks = load_tasks()
     tid = resolve_id(tasks, args.id)
+    set_result(tasks[tid])
     print(json.dumps(tasks[tid], ensure_ascii=False, indent=2))
 
 
 def cmd_export(args):
     tasks = load_tasks()
+    set_result(sorted(tasks.values(), key=lambda t: t['id']))
     if args.format == "markdown":
         _export_markdown(tasks)
     else:
@@ -224,6 +229,7 @@ def _export_markdown(tasks: dict) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(
         description="Todo task manager (JSONL event-sourced)",
@@ -287,4 +293,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -19,6 +19,10 @@ Activate when the user says:
 
 ## Usage
 
+Use `--scope project` or `--scope session --scope-session ID` for isolated notes,
+and `--json` for structured output. Global remains the default.
+See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 python3 ~/.ai-skills/notes/scripts/notes.py <command> [options]
 # or via wrapper:

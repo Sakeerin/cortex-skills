@@ -74,6 +74,14 @@ Skills that need AI (e.g., future summarization skills) use `_lib/ai_provider.py
 | `ai_provider.py` | Detect active AI provider; test connectivity; enumerate known models |
 | `logger.py` | ANSI-colored terminal output (`info`, `success`, `warning`, `error`) |
 | `jsonl_store.py` | Event-sourced JSONL load/append/compact shared by all data skills |
+| `data_scope.py` | Canonical project/session identities and isolated hashed storage namespaces |
+| `cli.py` | Invocation-local scope flags, structured result envelopes, and shared exit codes |
+| `errors.py` | Domain data-validation errors independent of output formatting |
+
+Scope context uses `ContextVar` and is reset after every CLI invocation, including
+failures, so in-process callers cannot inherit the preceding command's scope.
+Both data-directory entry points delegate to `env_loader.get_data_dir()`.
+See [CLI contract](cli-contract.md) for storage layout and compatibility guarantees.
 
 ### `env_loader.py`
 

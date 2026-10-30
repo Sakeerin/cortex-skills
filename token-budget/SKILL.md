@@ -10,6 +10,11 @@ Set and inspect daily, session, and monthly budgets that are backed by the share
 
 ## Usage
 
+Budget data supports `--scope project` and `--scope session --scope-session ID`;
+global remains the default. All commands accept `--json`. Session-scope status
+includes imported usage; a budget overrun is successful report data, not an exit failure.
+See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 token-budget set daily 5.00
 token-budget set session 1.00

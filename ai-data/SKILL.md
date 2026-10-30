@@ -24,6 +24,11 @@ ai-data restore ./skills-backup.zip --overwrite
 Python entrypoint: `python3 ai-data/scripts/ai_data.py`.
 Use `--data-dir PATH` before the subcommand to select a different data directory.
 Every subcommand supports `--json` for a machine-readable report.
+Reports use the shared envelope: read command results from `data`, and check `ok`
+and `exit_code`. Scope flags may appear before/after the subcommand:
+`ai-data backup --scope project` or `ai-data doctor --scope session --scope-session ID --json`.
+`--data-dir` overrides the base root; backup/restore/doctor affect only the selected
+namespace, never child scopes. Global remains the default. See [CLI contract](../docs/cli-contract.md).
 
 ## Data Safety
 

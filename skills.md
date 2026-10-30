@@ -12,6 +12,11 @@
 
 Skills ทั้งหมดรับ `--help` เพื่อดูคำสั่งแบบเต็ม
 
+Python CLIs support `--json` with a shared envelope and exit codes. Data-backed skills
+also support `--scope global|project|session` and `--scope-session ID`; global is the
+backwards-compatible default. See [CLI contract](docs/cli-contract.md) for examples,
+scope isolation, configuration, and JSON migration notes.
+
 ---
 
 ## Skills ที่มีทั้งหมด

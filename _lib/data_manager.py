@@ -223,8 +223,15 @@ def _document_error(name: str, obj: object) -> str | None:
             return "alert_threshold must be between 0 and 100"
         if not _number(obj.get("session_spend", 0)):
             return "session_spend must be finite and nonnegative"
+        if not _number(obj.get('session_baseline', 0)):
+            return 'session_baseline must be finite and nonnegative'
     # Importer state is opaque, but must be a well-formed JSON object.
     return None
+
+
+def validate_document(name: str, obj: object) -> str | None:
+    """Validate managed JSON documents for both readers and data doctor."""
+    return _document_error(name, obj)
 
 
 def _read_member(archive: zipfile.ZipFile, name: str, size: int) -> bytes:
@@ -366,6 +373,7 @@ class DataManager:
                             raise ValueError(f"Not a regular data file: {name}")
                         conflicts.append(name)
                 if conflicts and not overwrite:
+                    report['error_code'] = 'conflict'
                     for name in sorted(conflicts):
                         _issue(report, name, "File exists; overwrite=True is required")
                     return report
@@ -378,6 +386,9 @@ class DataManager:
                     report["changed"].append(name)
             except (OSError, ValueError, zipfile.BadZipFile, RuntimeError,
                     NotImplementedError, EOFError, RecursionError, zlib.error) as exc:
+                report['error_code'] = ('not_found' if isinstance(exc, FileNotFoundError)
+                                        else 'operation_failed' if isinstance(exc, OSError)
+                                        else 'invalid_data')
                 _issue(report, str(archive), str(exc))
         return report
 

@@ -19,6 +19,10 @@ Activate when the user:
 
 ## Usage
 
+Use `--scope project` or `--scope session --scope-session ID` for isolated prompt names,
+and `--json` for structured output (except interactive `edit`). Global remains the default.
+See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 python3 ~/.ai-skills/prompt-lib/scripts/prompt_lib.py <command>
 # or via wrapper:

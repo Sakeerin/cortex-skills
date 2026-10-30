@@ -17,7 +17,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -30,7 +30,9 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import get_data_dir, get
+from env_loader import get_data_dir  # noqa: E402
+from cli import command, set_result, CLIError, USAGE  # noqa: E402
+from data_scope import current_scope  # noqa: E402
 from cost_tracker import CostTracker  # noqa: E402
 from usage_importer import sync_usage  # noqa: E402
 
@@ -104,8 +106,9 @@ def collect_commits(target_date: str) -> list[str]:
              "--format=%s (%h)", "--no-merges"],
             capture_output=True, text=True, encoding="utf-8",
             errors="replace", check=False,
+            cwd=current_scope().project,
         )
-        lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return lines
     except FileNotFoundError:
         return []
@@ -292,6 +295,7 @@ def render_markdown(report_date: str, done: list, pending: list,
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(
         description="Generate daily standup report from todo, git, ai-cost, and notes data",
@@ -308,8 +312,7 @@ def main():
         try:
             date.fromisoformat(args.date)  # validates YYYY-MM-DD format
         except ValueError:
-            print(f"Invalid date '{args.date}'. Use YYYY-MM-DD format.", file=sys.stderr)
-            sys.exit(1)
+            raise CLIError(f"Invalid date '{args.date}'. Use YYYY-MM-DD format.", USAGE)
         target_date = args.date
     elif args.yesterday:
         target_date = (date.today() - timedelta(days=1)).isoformat()
@@ -320,6 +323,8 @@ def main():
     notes = collect_notes(target_date)
     commits = collect_commits(target_date)
     cost, tokens, model = collect_ai_cost(target_date)
+    set_result({'date': target_date, 'done': done, 'pending': pending, 'notes': notes,
+                'commits': commits, 'cost_usd': cost, 'tokens': tokens, 'top_model': model})
 
     renderers = {
         "default": render_default,
@@ -331,4 +336,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

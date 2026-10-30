@@ -26,6 +26,7 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
+from cli import command, set_result, CLIError, NOT_FOUND, DATA_ERROR, USAGE, json_mode  # noqa: E402
 
 BRIEF_FILENAME = "BRIEF.md"
 
@@ -84,6 +85,7 @@ def get_brief_path() -> Path:
 def cmd_init(args):
     path = Path.cwd() / BRIEF_FILENAME
     if path.exists():
+        set_result({'path': str(path), 'created': False})
         print(f"BRIEF.md already exists at {path}")
         print("Use 'project-brief edit' to modify it.")
         return
@@ -91,6 +93,7 @@ def cmd_init(args):
     project_name = Path.cwd().name
     content = BRIEF_TEMPLATE.format(project_name=project_name)
     path.write_text(content, encoding="utf-8")
+    set_result({'path': str(path), 'created': True})
     print(f"Created {path}")
     print("Edit it to describe your project, then run 'project-brief inject' to use it.")
 
@@ -98,8 +101,8 @@ def cmd_init(args):
 def cmd_show(args):
     path = find_brief()
     if path is None:
-        print("No BRIEF.md found. Run 'project-brief init' to create one.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError("No BRIEF.md found. Run 'project-brief init' to create one.", NOT_FOUND)
+    set_result({'path': str(path), 'content': path.read_text(encoding='utf-8')})
     print(f"# {path}\n")
     print(path.read_text(encoding="utf-8"))
 
@@ -108,10 +111,10 @@ def cmd_inject(args):
     """Print a formatted context block suitable for pasting into an AI system prompt."""
     path = find_brief()
     if path is None:
-        print("No BRIEF.md found. Run 'project-brief init' to create one.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError("No BRIEF.md found. Run 'project-brief init' to create one.", NOT_FOUND)
 
     content = path.read_text(encoding="utf-8").strip()
+    set_result({'path': str(path), 'content': content})
     print("<!-- PROJECT CONTEXT — paste into AI system prompt -->")
     print()
     print(content)
@@ -120,20 +123,20 @@ def cmd_inject(args):
 
 
 def cmd_edit(args):
+    if json_mode():
+        raise CLIError('Interactive editing is unavailable with --json', USAGE)
     path = find_brief()
     if path is None:
-        print("No BRIEF.md found. Run 'project-brief init' first.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError("No BRIEF.md found. Run 'project-brief init' first.", NOT_FOUND)
 
     editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "notepad" if os.name == "nt" else "nano"))
-    subprocess.run([editor, str(path)])
+    subprocess.run([editor, str(path)], check=True)
 
 
 def cmd_validate(args):
     path = find_brief()
     if path is None:
-        print("❌ No BRIEF.md found. Run 'project-brief init' to create one.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError("No BRIEF.md found. Run 'project-brief init' to create one.", NOT_FOUND)
 
     content = path.read_text(encoding="utf-8")
     issues = []
@@ -166,6 +169,7 @@ def cmd_validate(args):
     if not first_line.startswith("# "):
         issues.append("Missing project title (first line should be '# Project Brief: ...')")
 
+    set_result({'path': str(path), 'issues': issues, 'warnings': warnings, 'valid': not issues})
     if issues:
         for issue in issues:
             print(f"❌ {issue}")
@@ -175,16 +179,17 @@ def cmd_validate(args):
     if not issues and not warnings:
         print(f"✅ BRIEF.md looks good ({path})")
     elif not issues:
-        print(f"\n✅ No errors — but consider filling in the warnings above.")
+        print("\n✅ No errors — but consider filling in the warnings above.")
         sys.exit(0)
     else:
-        sys.exit(1)
+        raise CLIError('BRIEF.md validation failed', DATA_ERROR)
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
+@command()
 def main():
     parser = argparse.ArgumentParser(
         description="Load project context into any AI agent",
@@ -209,4 +214,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

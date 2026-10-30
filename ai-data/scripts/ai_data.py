@@ -14,8 +14,11 @@ if hasattr(sys.stderr, 'reconfigure'):
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / '_lib'))
 from data_manager import DataManager  # noqa: E402
 from env_loader import get_data_dir  # noqa: E402
+from cli import command, set_result, CLIError, DATA_ERROR, CONFLICT, NOT_FOUND, FAILURE  # noqa: E402
+from data_scope import current_scope  # noqa: E402
 
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir', type=Path, help='Override AI_SKILLS_DATA_DIR')
@@ -28,17 +31,18 @@ def main():
     restore.add_argument('--dry-run', action='store_true', help='Validate and preview only')
     doctor = sub.add_parser('doctor', help='Check data syntax and schemas')
     doctor.add_argument('--repair', action='store_true', help='Back up and quarantine invalid JSONL lines')
-    for command in (backup, restore, doctor):
-        command.add_argument('--json', action='store_true', help='Print a machine-readable result')
+    for subcommand in (backup, restore, doctor):
+        subcommand.add_argument('--json', action='store_true', help='Print a machine-readable result')
     args = parser.parse_args()
     try:
-        manager = DataManager(args.data_dir.expanduser() if args.data_dir else get_data_dir())
+        manager = DataManager(current_scope().directory(args.data_dir.expanduser()) if args.data_dir else get_data_dir())
         if args.command == 'backup':
             report = {'backup': str(manager.backup(args.output))}
         elif args.command == 'restore':
             report = manager.restore(args.archive, overwrite=args.overwrite, dry_run=args.dry_run)
         else:
             report = manager.doctor(repair=args.repair)
+        set_result(report)
         if args.json:
             print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.command == 'backup':
@@ -59,11 +63,15 @@ def main():
             if report.get('backup'):
                 print(f"Safety backup: {report['backup']}")
         if args.command != 'backup' and not report.get('ok', True):
-            return 1
+            conflict = report.get('error_code') == 'conflict'
+            exit_code = {'conflict': CONFLICT, 'not_found': NOT_FOUND,
+                         'operation_failed': FAILURE}.get(report.get('error_code'), DATA_ERROR)
+            raise CLIError('Restore conflicts with existing data' if conflict
+                           else 'Data validation failed; see report issues',
+                           exit_code)
         return 0
-    except (OSError, ValueError, TimeoutError) as exc:
-        print(f'Error: {exc}', file=sys.stderr)
-        return 1
+    except ValueError as exc:
+        raise CLIError(str(exc), DATA_ERROR) from exc
 
 
 if __name__ == '__main__':

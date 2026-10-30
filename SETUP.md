@@ -26,6 +26,11 @@ Complete installation and configuration guide for all supported AI providers.
 
 ## Prerequisites
 
+For project/session data separation and machine-readable automation, see the
+[CLI contract](docs/cli-contract.md). Configure `AI_SKILLS_SCOPE`,
+`AI_SKILLS_PROJECT_DIR`, and `AI_SKILLS_SESSION_ID`, or pass scope flags per command.
+Existing installations remain in global scope unless explicitly configured otherwise.
+
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.11+ | `python3 --version` |

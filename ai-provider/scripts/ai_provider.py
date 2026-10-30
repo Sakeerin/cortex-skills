@@ -19,7 +19,7 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from ai_provider import (
+from ai_provider import (  # noqa: E402
     PROVIDER_METADATA,
     detect,
     get_base_url_env_key,
@@ -29,10 +29,12 @@ from ai_provider import (
     set_provider,
     test_provider,
 )
+from cli import command, set_result, CLIError, UNAVAILABLE  # noqa: E402
 
 
 def cmd_status(_args) -> None:
     details = get_provider_details()
+    set_result(details)
     print("AI Provider Status")
     print("-" * 50)
     print(f"Provider:    {details['display_name']} ({details['provider']})")
@@ -45,6 +47,9 @@ def cmd_status(_args) -> None:
 
 def cmd_list(_args) -> None:
     current = detect()
+    set_result([{'provider': p, 'current': p == current,
+                 'display_name': PROVIDER_METADATA[p]['display_name']}
+                for p in list_supported()])
     print("Supported Providers")
     print("-" * 50)
     for provider in list_supported():
@@ -64,6 +69,8 @@ def cmd_set(args) -> None:
         global_config=args.global_config,
     )
     scope = "global" if args.global_config else "project"
+    set_result({'config_path': str(path), 'config_scope': scope, 'provider': args.provider,
+                'model': args.model, 'base_url': args.base_url})
     print(f"Updated {scope} config: {path}")
     print(f"AI_PROVIDER={args.provider}")
     if args.model:
@@ -75,6 +82,7 @@ def cmd_set(args) -> None:
 
 def cmd_test(args) -> None:
     result = test_provider(args.provider)
+    set_result(result)
     print("AI Provider Test")
     print("-" * 50)
     print(f"Provider: {result['provider']}")
@@ -86,7 +94,7 @@ def cmd_test(args) -> None:
     else:
         print("Status:   FAILED")
         print(f"Message:  {result.get('message', 'unknown error')}")
-        raise SystemExit(1)
+        raise CLIError(result.get('message', 'Provider connection failed'), UNAVAILABLE)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -109,6 +117,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@command()
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -116,4 +125,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

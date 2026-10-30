@@ -33,8 +33,11 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import get_data_dir
-from file_lock import atomic_write, data_lock
+from env_loader import get_data_dir  # noqa: E402
+from file_lock import atomic_write, data_lock  # noqa: E402
+from cli import command, set_result, CLIError, NOT_FOUND, CONFLICT, USAGE, json_mode  # noqa: E402
+from data_manager import validate_document  # noqa: E402
+from errors import DataError  # noqa: E402
 
 _VAR_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 
@@ -52,7 +55,11 @@ def load_prompts() -> dict:
     if not path.exists():
         return {}
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    error = validate_document('prompts.json', data)
+    if error:
+        raise DataError(f'Invalid prompt data: {error}; run ai-data doctor')
+    return data
 
 
 def save_prompts(prompts: dict) -> None:
@@ -74,8 +81,7 @@ def cmd_add(args):
     prompts = load_prompts()
     name = args.name
     if name in prompts:
-        print(f"Prompt '{name}' already exists. Use 'edit' to modify it.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Prompt '{name}' already exists. Use 'edit' to modify it.", CONFLICT)
     ts = now_iso()
     prompts[name] = {
         "name": name,
@@ -86,6 +92,7 @@ def cmd_add(args):
         "updated_at": ts,
     }
     save_prompts(prompts)
+    set_result(prompts[name])
     vars_found = extract_vars(args.text)
     vars_str = f"  variables: {vars_found}" if vars_found else ""
     print(f"Added prompt '{name}'{vars_str}")
@@ -98,6 +105,7 @@ def cmd_list(args):
     if args.tag:
         items = [p for p in items if args.tag in (p.get("tags") or [])]
 
+    set_result(sorted(items, key=lambda p: p['name']))
     if not items:
         print("No prompts found.")
         return
@@ -122,6 +130,7 @@ def cmd_search(args):
         or kw in p["content"].lower()
         or kw in " ".join(p.get("tags") or []).lower()
     ]
+    set_result(sorted(matches, key=lambda p: p['name']))
     if not matches:
         print(f"No prompts matching '{args.keyword}'.")
         return
@@ -134,8 +143,7 @@ def cmd_use(args):
     prompts = load_prompts()
     name = args.name
     if name not in prompts:
-        print(f"Prompt '{name}' not found. Run 'prompt-lib list' to see available prompts.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Prompt '{name}' not found. Run 'prompt-lib list' to see available prompts.", NOT_FOUND)
 
     content = prompts[name]["content"]
     vars_found = extract_vars(content)
@@ -144,8 +152,7 @@ def cmd_use(args):
     substitutions = {}
     for pair in (args.with_ or []):
         if "=" not in pair:
-            print(f"Invalid --with value '{pair}'. Use KEY=VALUE format.", file=sys.stderr)
-            sys.exit(1)
+            raise CLIError(f"Invalid --with value '{pair}'. Use KEY=VALUE format.", USAGE)
         k, _, v = pair.partition("=")
         substitutions[k.strip()] = v.strip()
 
@@ -160,15 +167,17 @@ def cmd_use(args):
     if remaining:
         print(f"⚠️  Unfilled variables: {remaining}", file=sys.stderr)
 
+    set_result({'name': name, 'content': result, 'unfilled_variables': remaining})
     print(result)
 
 
 def cmd_edit(args):
+    if json_mode():
+        raise CLIError('Interactive editing is unavailable with --json', USAGE)
     prompts = load_prompts()
     name = args.name
     if name not in prompts:
-        print(f"Prompt '{name}' not found.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Prompt '{name}' not found.", NOT_FOUND)
 
     editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "notepad" if os.name == "nt" else "nano"))
 
@@ -194,10 +203,10 @@ def cmd_delete(args):
     prompts = load_prompts()
     name = args.name
     if name not in prompts:
-        print(f"Prompt '{name}' not found.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Prompt '{name}' not found.", NOT_FOUND)
     del prompts[name]
     save_prompts(prompts)
+    set_result({'name': name, 'deleted': True})
     print(f"Deleted prompt '{name}'")
 
 
@@ -209,8 +218,7 @@ def cmd_export(args):
 def cmd_import(args):
     path = Path(args.file)
     if not path.exists():
-        print(f"File not found: {args.file}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f'File not found: {args.file}', NOT_FOUND)
 
     with open(path, "r", encoding="utf-8") as f:
         incoming = json.load(f)
@@ -225,6 +233,7 @@ def cmd_import(args):
         added += 1
 
     save_prompts(prompts)
+    set_result({'imported': added, 'skipped': skipped})
     print(f"Imported {added} prompt(s)" + (f", skipped {skipped} (already exist — use --overwrite)" if skipped else ""))
 
 
@@ -232,6 +241,7 @@ def cmd_import(args):
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(description="Personal prompt library with template variables")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -274,4 +284,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

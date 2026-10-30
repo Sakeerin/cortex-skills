@@ -37,12 +37,17 @@ from monetary totals with a visible warning. Totals with unpriced records are in
 Claude `server_tool_use` request counts are retained separately and make the request's price
 unknown until server-tool pricing is supported; they are not silently counted as token-only charges.
 Source logs and configured rates determine accuracy; provider subscriptions are not billed
-by these estimates. Historical imports do not increment the live session budget counter.
+by these estimates. Historical imports do not increment the legacy live session budget
+counter in global/project scope. Session-scope budgets include that session's imported costs.
 
 Use `AI_USAGE_AUTO_IMPORT=0` or `--no-import` on `ai-cost` reports to keep reporting read-only.
 `token-budget status` and the AI usage section of `daily-report` also synchronize local usage;
 use `AI_USAGE_AUTO_IMPORT=0` to disable synchronization for these commands.
-The default scope is all sessions found under the configured directories, not only the current project.
+The default global scope includes all sessions found under the configured directories.
+Use `--scope project` or `--scope session --scope-session ID` to isolate data and
+conservatively filter project/session provenance. Missing project metadata requires
+explicit `--source` attribution; known different projects are never reassigned.
+See [scope and JSON contract](cli-contract.md) for storage isolation and exit codes.
 Changed logs are backed up before import. Neither source prompt text nor credentials are archived.
 Backups contain personal skill data and are not encrypted. There is no background scheduler.
 

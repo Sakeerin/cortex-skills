@@ -22,6 +22,7 @@ if str(_LIB_DIR) not in sys.path:
 
 from cost_tracker import CostTracker  # noqa: E402
 from usage_importer import UsageImporter, sync_usage  # noqa: E402
+from cli import command, set_result, CLIError, DATA_ERROR  # noqa: E402
 
 
 def _format_money(value: float) -> str:
@@ -50,6 +51,8 @@ def cmd_period(args) -> None:
     else:
         total = tracker.get_monthly_cost()
         label = "this month"
+    set_result({'period': args.command, 'cost_usd': total,
+                'unpriced_events': sum(e.get('cost_usd') is None for e in tracker.load_events())})
     print(f"AI Cost - {label}")
     print("-" * 50)
     print(f"Total: {_format_money(total)}")
@@ -58,6 +61,8 @@ def cmd_period(args) -> None:
 def cmd_breakdown(args) -> None:
     tracker = _report_tracker(args)
     breakdown = tracker.get_breakdown()
+    set_result([{'provider': provider, 'model': model, **values}
+                for (provider, model), values in sorted(breakdown.items())])
     print("AI Cost Breakdown")
     print("-" * 70)
     if not breakdown:
@@ -74,6 +79,7 @@ def cmd_export(args) -> None:
     tracker = _report_tracker(args)
     output = Path(args.output) if args.output else tracker.data_dir / "cost-report.csv"
     tracker.export_csv(output)
+    set_result({'output': str(output), 'format': 'csv'})
     print(f"Exported CSV: {output}")
 
 
@@ -81,9 +87,11 @@ def cmd_budget(args) -> None:
     tracker = CostTracker() if args.budget_command == 'set' else _report_tracker(args)
     if args.budget_command == "set":
         tracker.set_budget("daily", args.amount)
+        set_result(tracker.get_budgets())
         print(f"Daily budget set to {_format_money(args.amount)}")
     else:
         used, limit, exceeded = tracker.check_budget("daily")
+        set_result({'used': used, 'limit': limit, 'exceeded': exceeded})
         print("AI Cost Budget")
         print("-" * 50)
         print(f"Used:  {_format_money(used)}")
@@ -100,6 +108,7 @@ def cmd_log(args) -> None:
         args.output_tokens,
         session_id=args.session_id,
     )
+    set_result(event)
     print(f"Logged usage for {event['provider']} / {event['model']}")
     print(f"Tokens: {event['total_tokens']:,}")
     print(f"Cost:   {_format_money(event['cost_usd'])}")
@@ -107,6 +116,7 @@ def cmd_log(args) -> None:
 
 def cmd_import(args) -> None:
     result = UsageImporter(CostTracker()).import_usage(args.provider, args.source, args.dry_run)
+    set_result(result)
     if args.json:
         print(json.dumps(result, indent=2))
     else:
@@ -114,12 +124,13 @@ def cmd_import(args) -> None:
         print(f"New: {result['imported']}  Updated: {result['updated']}  Duplicates: {result['duplicates']}")
         print(f"Scanned files: {result['files_scanned']}  Unchanged: {result['files_unchanged']}")
         print(f"Unpriced records: {result['unpriced']}")
+        print(f"Records outside scope or without project provenance: {result['skipped_scope']}")
         if result['backup']:
             print(f"Safety backup: {result['backup']}")
         for warning in result['warnings']:
             print(f'Warning: {warning}', file=sys.stderr)
     if result['warnings']:
-        raise SystemExit(1)
+        raise CLIError('Usage import was incomplete; inspect the warnings', DATA_ERROR)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -166,15 +177,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@command(scoped=True)
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    try:
-        args.func(args)
-    except (OSError, ValueError, TimeoutError) as exc:
-        print(f'Error: {exc}', file=sys.stderr)
-        raise SystemExit(1) from exc
+    args.func(args)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

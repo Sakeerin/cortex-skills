@@ -56,6 +56,22 @@ python3 ~/.ai-skills/env-check/scripts/env_check.py --fix
 
 See [skills.md](skills.md) for the full catalog with data paths and compatibility matrix.
 
+## Project/Session Scope and JSON
+
+Data commands support isolated `--scope global|project|session` namespaces. Global
+remains the default, preserving existing data. All Python skill CLIs support a
+shared `--json` envelope and exit codes for scripts and agents.
+
+```bash
+todo add --title "Project task" --scope project
+todo list --scope project --json
+ai-cost today --scope session --scope-session chat-42 --json
+ai-data backup --scope project
+```
+
+See [scope selection, JSON schema, and exit codes](docs/cli-contract.md), including
+the migration of older bare `ai-data`/usage-import JSON reports into `data`.
+
 ---
 
 ## Usage with AI Agents

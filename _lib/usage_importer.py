@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -11,6 +12,8 @@ from cost_tracker import CostTracker
 from data_manager import DataManager, validate_cost_event
 from env_loader import get
 from file_lock import atomic_write, data_lock
+from data_scope import project_root
+from errors import DataError
 
 
 def _signature(path):
@@ -171,7 +174,7 @@ class UsageImporter:
             return [root] if not root.is_symlink() else []
         if not root.exists():
             if source is not None:
-                raise ValueError(f'Session source not found: {root}')
+                raise FileNotFoundError(f'Session source not found: {root}')
             return []
         suffixes = {'.jsonl'} if provider == 'claude' else {'.json', '.jsonl'}
         return sorted(path for path in root.rglob('*') if path.is_file() and not path.is_symlink()
@@ -179,14 +182,18 @@ class UsageImporter:
                       and (provider == 'claude' or source is not None
                            or path.name.startswith('session-')))
 
-    def _read(self, provider, path, warnings):
+    def _read(self, provider, path, warnings, explicit_source=False):
         records = []
+        scope = self.tracker.scope
+        project = None
+        skipped = 0
         if path.suffix == '.json':
             with path.open(encoding='utf-8-sig') as handle:
                 document = json.load(handle)
             if not isinstance(document, dict):
                 raise ValueError('session document must be an object')
             session = document.get('sessionId') or document.get('session_id') or path.stem
+            project = document.get('cwd') or document.get('projectDirectory') or document.get('projectPath')
             rows = document.get('messages', [])
             if not isinstance(rows, list):
                 raise ValueError('messages must be an array')
@@ -197,14 +204,33 @@ class UsageImporter:
         for index, row in lines:
             if not isinstance(row, dict):
                 continue
-            session = row.get('sessionId') or row.get('session_id') or session
+            next_session = row.get('sessionId') or row.get('session_id') or session
+            if next_session != session:
+                project = None
+            session = next_session
+            project = row.get('cwd') or row.get('projectDirectory') or row.get('projectPath') or project
             try:
                 event = _normalize(provider, row, session, path)
                 if event is not None:
+                    if scope.kind != 'global':
+                        # Explicit source can attribute records with no provenance,
+                        # but must never override a known different project.
+                        if isinstance(project, str) and Path(project).is_absolute():
+                            canonical = os.path.normcase(str(project_root(Path(project))))
+                            if canonical != scope.project:
+                                skipped += 1
+                                continue
+                        elif not explicit_source:
+                            skipped += 1
+                            continue
+                        if scope.kind == 'session' and event['session_id'] != scope.session:
+                            skipped += 1
+                            continue
+                        event['metadata']['project_dir'] = scope.project
                     records.append(event)
             except (TypeError, ValueError) as exc:
                 warnings.append(f'{path}:{index}: {exc}')
-        return records
+        return records, skipped
 
     def import_usage(self, provider=None, source=None, dry_run=False):
         if provider not in (None, 'claude', 'gemini'):
@@ -218,6 +244,7 @@ class UsageImporter:
 
     def _import(self, provider, source, dry_run):
         result = {'imported': 0, 'updated': 0, 'duplicates': 0, 'unpriced': 0,
+                  'skipped_scope': 0,
                   'files_scanned': 0, 'files_unchanged': 0, 'warnings': [],
                   'backup': None, 'dry_run': dry_run}
         log_path = self.tracker.log_path
@@ -232,7 +259,7 @@ class UsageImporter:
                             raise ValueError(error)
                         events.append(event)
                     except ValueError as exc:
-                        raise ValueError('Invalid cost log; run ai-data doctor before importing') from exc
+                        raise DataError('Invalid cost log; run ai-data doctor before importing') from exc
         indexes = {event['id']: index for index, event in enumerate(events)}
         old_signature = _signature(log_path) if log_path.exists() else None
         rate_signature = _signature(self.tracker.rate_path) if self.tracker.rate_path.exists() else None
@@ -251,14 +278,17 @@ class UsageImporter:
         candidates = {}
         for name in ([provider] if provider else ['claude', 'gemini']):
             for path in self._files(name, source):
-                key = name + ':' + str(path.resolve())
+                # Explicit import is an attribution decision; it must not reuse
+                # the cache from a conservative automatic scope scan.
+                key = ('explicit:' if source is not None else 'auto:') + name + ':' + str(path.resolve())
                 try:
                     signature = _signature(path)
                     if previous_files.get(key) == signature:
                         result['files_unchanged'] += 1
                         continue
                     warning_count = len(result['warnings'])
-                    records = self._read(name, path, result['warnings'])
+                    records, skipped = self._read(name, path, result['warnings'], explicit_source=source is not None)
+                    result['skipped_scope'] += skipped
                     result['files_scanned'] += 1
                     for event in records:
                         identity = event['id']
@@ -310,6 +340,9 @@ def sync_usage(tracker):
         report = UsageImporter(tracker).import_usage()
         if report['imported'] or report['updated']:
             print(f"Usage import: {report['imported']} new, {report['updated']} updated", file=sys.stderr)
+        if report['skipped_scope']:
+            print(f"Usage import: skipped {report['skipped_scope']} record(s) outside the selected scope "
+                  'or without project provenance.', file=sys.stderr)
         for warning in report['warnings'][:5]:
             print(f'Usage import warning: {warning}', file=sys.stderr)
         return report

@@ -18,6 +18,10 @@ Activate when the user:
 
 ## Usage
 
+Use `--scope project` or `--scope session --scope-session ID` for isolated skill data,
+and `--json` for a structured report. Git commits come from the selected project.
+Global remains the default. See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 python3 ~/.ai-skills/daily-report/scripts/daily_report.py [options]
 # or via wrapper:

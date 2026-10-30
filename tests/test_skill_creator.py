@@ -1,9 +1,10 @@
 """Tests for skill-creator/scripts/skill_creator.py"""
 
 import sys
+import json
+import os
+import subprocess
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "skill-creator" / "scripts"))
@@ -152,3 +153,20 @@ def test_validate_passes_for_complete_skill(tmp_path, capsys):
 
     out = capsys.readouterr().out
     assert "ok-skill" in out
+
+
+def test_generated_python_skill_supports_scopes_and_json(tmp_path, monkeypatch):
+    sc = _get_module()
+    sc._REPO_ROOT = tmp_path
+    monkeypatch.setattr(sys, 'argv', ['skill-creator', 'new', 'json-skill'])
+    sc.main()
+    environment = dict(os.environ, PYTHONPATH=str(REPO_ROOT / '_lib'),
+                       AI_SKILLS_DATA_DIR=str(tmp_path / 'data'))
+    result = subprocess.run([sys.executable, '-B',
+        str(tmp_path / 'json-skill/scripts/main.py'), 'example', '--json',
+        '--scope', 'project', '--scope-project', str(tmp_path)],
+        env=environment, capture_output=True, text=True, encoding='utf-8', timeout=30)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload['ok'] and payload['data'] == 'Done.'
+    assert payload['scope']['kind'] == 'project'

@@ -28,8 +28,7 @@ for d in [str(_LIB_DIR), str(_ADAPTERS_DIR)]:
     if d not in sys.path:
         sys.path.insert(0, d)
 
-from env_loader import get
-from ai_provider import detect as detect_provider
+from cli import command, set_result, CLIError, NOT_FOUND  # noqa: E402
 
 
 def _get_adapter(provider: str):
@@ -71,6 +70,7 @@ def _fmt_number(n: int) -> str:
 def cmd_latest(args):
     count = args.count
     sessions = _all_sessions(args.provider, limit=max(count, 20))[:count]
+    set_result(sessions)
 
     if not sessions:
         prov = args.provider or "any provider"
@@ -105,6 +105,7 @@ def cmd_search(args):
         if adapter:
             results.extend(adapter.search_sessions(kw, limit=10))
 
+    set_result(results)
     if not results:
         print(f"No sessions found matching '{kw}'.")
         return
@@ -132,10 +133,10 @@ def cmd_search(args):
 def cmd_export(args):
     sessions = _all_sessions(args.provider, limit=5)
     if not sessions:
-        print("No sessions found.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError('No sessions found.', NOT_FOUND)
 
     session = sessions[0]
+    set_result(session)
     fmt = args.format
 
     if fmt == "markdown":
@@ -158,6 +159,7 @@ def cmd_export(args):
 
 def cmd_stats(args):
     sessions = _all_sessions(args.provider, limit=200)
+    set_result({'sessions': len(sessions), 'by_provider': {}})
     if not sessions:
         print("No sessions found.")
         return
@@ -178,12 +180,14 @@ def cmd_stats(args):
     for p, data in sorted(by_provider.items()):
         print(f"{p:<12} {data['sessions']:>8} {data['turns']:>8} "
               f"{_fmt_number(data['input']):>12} {_fmt_number(data['output']):>12}")
+    set_result({'sessions': len(sessions), 'by_provider': by_provider})
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
+@command()
 def main():
     parser = argparse.ArgumentParser(
         description="Unified session log across AI providers",
@@ -214,4 +218,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

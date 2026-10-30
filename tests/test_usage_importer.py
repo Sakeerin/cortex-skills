@@ -254,7 +254,7 @@ def test_invalid_existing_metadata_is_reported_by_doctor_and_blocks_import(impor
 def test_missing_source_and_ambiguous_provider_are_rejected(importer, tmp_path):
     with pytest.raises(ValueError, match='requires'):
         importer.import_usage(source=tmp_path)
-    with pytest.raises(ValueError, match='not found'):
+    with pytest.raises(FileNotFoundError, match='not found'):
         importer.import_usage('claude', tmp_path / 'missing')
 
 

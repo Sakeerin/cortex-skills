@@ -19,6 +19,10 @@ Activate when the user wants to:
 
 ## Usage
 
+Supports isolated `--scope project` / `--scope session --scope-session ID` and shared
+`--json` output. Global remains the default; `--project` is still a task label.
+See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 # Via Python
 python3 ~/.ai-skills/todo/scripts/tasks.py <command> [options]

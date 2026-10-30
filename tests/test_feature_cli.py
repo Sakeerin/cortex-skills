@@ -24,25 +24,25 @@ def test_doctor_repair_restore_and_exit_codes(tmp_path):
     (data / 'todos.jsonl').write_bytes(original)
     backup = run_data(data, 'backup', '--json')
     assert backup.returncode == 0, backup.stderr
-    archive = json.loads(backup.stdout)['backup']
+    archive = json.loads(backup.stdout)['data']['backup']
     doctor = run_data(data, 'doctor', '--json')
-    assert doctor.returncode == 1
-    assert json.loads(doctor.stdout)['issues'][0]['line'] == 2
+    assert doctor.returncode == 5
+    assert json.loads(doctor.stdout)['data']['issues'][0]['line'] == 2
     repaired = run_data(data, 'doctor', '--repair', '--json')
     assert repaired.returncode == 0, repaired.stderr
-    report = json.loads(repaired.stdout)
+    report = json.loads(repaired.stdout)['data']
     assert report['ok'] and Path(report['backup']).exists()
     assert Path(report['quarantine'][0]).read_bytes() == b'BROKEN\n'
     repaired_bytes = (data / 'todos.jsonl').read_bytes()
     conflict = run_data(data, 'restore', archive, '--json')
-    assert conflict.returncode == 1
+    assert conflict.returncode == 4
     assert (data / 'todos.jsonl').read_bytes() == repaired_bytes
     preview = run_data(data, 'restore', archive, '--overwrite', '--dry-run', '--json')
     assert preview.returncode == 0
     assert (data / 'todos.jsonl').read_bytes() == repaired_bytes
     restored = run_data(data, 'restore', archive, '--overwrite', '--json')
     assert restored.returncode == 0, restored.stderr
-    assert json.loads(restored.stdout)['backup']
+    assert json.loads(restored.stdout)['data']['backup']
     assert (data / 'todos.jsonl').read_bytes() == original
 
 
@@ -50,7 +50,7 @@ def test_restore_invalid_archive_does_not_claim_success(tmp_path):
     archive = tmp_path / 'broken.zip'
     archive.write_bytes(b'not zip')
     failed = run_data(tmp_path / 'data', 'restore', archive)
-    assert failed.returncode == 1
+    assert failed.returncode == 5
     assert 'Restored:' not in failed.stdout
     assert 'Error:' in failed.stderr
 
@@ -60,7 +60,7 @@ def test_whole_json_document_requires_manual_recovery(tmp_path):
     data.mkdir()
     (data / 'prompts.json').write_text('{invalid')
     report = run_data(data, 'doctor', '--repair', '--json')
-    assert report.returncode == 1
+    assert report.returncode == 5
     assert (data / 'prompts.json').read_text() == '{invalid'
 
 
@@ -95,7 +95,7 @@ def test_simultaneous_imports_count_a_request_once(tmp_path, monkeypatch):
     second = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     outputs = [first.communicate(timeout=30), second.communicate(timeout=30)]
     assert first.returncode == second.returncode == 0, outputs
-    assert sum(json.loads(output)['imported'] for output, _ in outputs) == 1
+    assert sum(json.loads(output)['data']['imported'] for output, _ in outputs) == 1
     assert len((data / 'cost-log.jsonl').read_text().splitlines()) == 1
     assert not (data / 'budget.json').exists()
 

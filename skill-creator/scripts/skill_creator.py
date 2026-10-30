@@ -26,6 +26,7 @@ _TEMPLATES_DIR = _REPO_ROOT / "_templates"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
+from cli import command, set_result, CLIError, USAGE, CONFLICT, NOT_FOUND, DATA_ERROR  # noqa: E402
 REQUIRED_FILES = ["SKILL.md"]
 OPTIONAL_FILES = ["scripts/main.py", "scripts/main.sh"]
 
@@ -98,6 +99,7 @@ if str(_LIB_DIR) not in sys.path:
 
 from env_loader import get, get_data_dir
 from logger import info, success, warning, error
+from cli import command, set_result
 
 
 def get_data_file() -> Path:
@@ -111,12 +113,14 @@ def get_data_file() -> Path:
 def cmd_example(args):
     info("Running example command...")
     success("Done.")
+    set_result('Done.')
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(description="{description}")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -128,7 +132,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
 """
 
 _WRAPPER_SH = """\
@@ -161,13 +165,11 @@ echo "{name}: not yet implemented"
 def cmd_new(args):
     name = args.name.lower().replace(" ", "-")
     if not re.match(r"^[a-z][a-z0-9-]*$", name):
-        print(f"Invalid skill name '{name}'. Use lowercase letters, numbers, and hyphens.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Invalid skill name '{name}'. Use lowercase letters, numbers, and hyphens.", USAGE)
 
     skill_dir = _REPO_ROOT / name
     if skill_dir.exists():
-        print(f"Skill '{name}' already exists at {skill_dir}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Skill '{name}' already exists at {skill_dir}", CONFLICT)
 
     description = args.description or f"{name} skill"
     is_bash = args.bash
@@ -202,15 +204,17 @@ def cmd_new(args):
         wrapper = skill_dir / name
         wrapper.write_text(_WRAPPER_SH, encoding="utf-8")
 
+    set_result({'name': name, 'path': str(skill_dir),
+                'files': [str(p.relative_to(skill_dir)) for p in sorted(skill_dir.rglob('*')) if p.is_file()]})
     print(f"Created skill '{name}' at {skill_dir}/")
-    print(f"\nFiles created:")
+    print("\nFiles created:")
     for f in sorted(skill_dir.rglob("*")):
         if f.is_file():
             print(f"  {f.relative_to(_REPO_ROOT)}")
-    print(f"\nNext steps:")
+    print("\nNext steps:")
     print(f"  1. Edit {name}/SKILL.md — describe when to use and how")
     print(f"  2. Implement {name}/scripts/main{'.' + ('sh' if is_bash else 'py')}")
-    print(f"  3. Add to skills.md table")
+    print("  3. Add to skills.md table")
     print(f"  4. Test: python3 {name}/scripts/main.py --help")
 
 
@@ -229,18 +233,18 @@ def cmd_list(args):
                 status = "✅" if has_impl else "📄"
                 skills.append((d.name, status))
 
+    set_result([{'name': name, 'implemented': status == '\u2705'} for name, status in skills])
     print(f"Skills in {_REPO_ROOT.name}/ ({len(skills)} total)\n")
     for name, status in skills:
         print(f"  {status}  {name}")
-    print(f"\n✅ = has implementation  📄 = SKILL.md only")
+    print("\n✅ = has implementation  📄 = SKILL.md only")
 
 
 def cmd_validate(args):
     name = args.name
     skill_dir = _REPO_ROOT / name
     if not skill_dir.exists():
-        print(f"Skill '{name}' not found at {skill_dir}", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Skill '{name}' not found at {skill_dir}", NOT_FOUND)
 
     errors = []
     warnings = []
@@ -268,6 +272,7 @@ def cmd_validate(args):
     if not wrapper.exists() and scripts:
         warnings.append(f"Missing shell wrapper: {name}/{name}")
 
+    set_result({'name': name, 'errors': errors, 'warnings': warnings, 'valid': not errors})
     if errors:
         for e in errors:
             print(f"❌ {e}")
@@ -277,15 +282,16 @@ def cmd_validate(args):
     if not errors and not warnings:
         print(f"✅ Skill '{name}' looks good")
     elif not errors:
-        print(f"\n✅ No errors")
+        print("\n✅ No errors")
     else:
-        sys.exit(1)
+        raise CLIError('Skill validation failed', DATA_ERROR)
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
+@command()
 def main():
     parser = argparse.ArgumentParser(description="Scaffold and manage AI skills")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -305,4 +311,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

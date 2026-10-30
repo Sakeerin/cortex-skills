@@ -19,6 +19,7 @@ if str(_LIB_DIR) not in sys.path:
 
 from env_loader import get, get_data_dir
 from logger import info, success, warning, error, header
+from cli import command, set_result
 
 
 # ---------------------------------------------------------------------------
@@ -36,12 +37,14 @@ def get_data_file() -> Path:
 def cmd_example(args):
     info("Running example command...")
     success("Done.")
+    set_result({'message': 'Done.'})
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(
         description="{{SHORT_DESCRIPTION}}",
@@ -59,4 +62,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

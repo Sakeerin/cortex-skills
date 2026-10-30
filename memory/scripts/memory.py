@@ -30,8 +30,9 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import get_data_dir
-from jsonl_store import JSONLStore
+from env_loader import get_data_dir  # noqa: E402
+from jsonl_store import JSONLStore  # noqa: E402
+from cli import command, set_result, CLIError, NOT_FOUND, CONFLICT  # noqa: E402
 
 
 def get_memory_file() -> Path:
@@ -74,6 +75,7 @@ def cmd_add(args):
         "updated_at": ts,
     }
     append_event(event)
+    set_result(event)
     action = "Updated" if is_update else "Saved"
     print(f"{action} memory '{key}'")
 
@@ -85,6 +87,7 @@ def cmd_list(args):
     if args.tag:
         items = [e for e in items if args.tag in (e.get("tags") or [])]
 
+    set_result(items)
     if not items:
         print("No memory entries found.")
         return
@@ -106,12 +109,11 @@ def cmd_get(args):
         # Try prefix match
         matches = [k for k in entries if k.startswith(key)]
         if not matches:
-            print(f"Memory '{key}' not found.", file=sys.stderr)
-            sys.exit(1)
+            raise CLIError(f"Memory '{key}' not found.", NOT_FOUND)
         if len(matches) > 1:
-            print(f"Ambiguous key '{key}': {matches}", file=sys.stderr)
-            sys.exit(1)
+            raise CLIError(f'Ambiguous key: {key}', CONFLICT)
         key = matches[0]
+    set_result(entries[key])
     print(entries[key]["value"])
 
 
@@ -124,6 +126,7 @@ def cmd_search(args):
         or kw in e["value"].lower()
         or kw in " ".join(e.get("tags") or []).lower()
     ]
+    set_result(sorted(matches, key=lambda e: e['key']))
     if not matches:
         print(f"No memory matching '{args.keyword}'.")
         return
@@ -139,9 +142,9 @@ def cmd_delete(args):
     entries = load_memory()
     key = args.key
     if key not in entries:
-        print(f"Memory '{key}' not found.", file=sys.stderr)
-        sys.exit(1)
+        raise CLIError(f"Memory '{key}' not found.", NOT_FOUND)
     append_event({"key": key, "deleted": True, "updated_at": now_iso()})
+    set_result({'key': key, 'deleted': True})
     print(f"Deleted memory '{key}'")
 
 
@@ -162,12 +165,14 @@ def cmd_context(args):
 
 def cmd_export(args):
     entries = load_memory()
+    set_result(sorted(entries.values(), key=lambda e: e['key']))
     for e in sorted(entries.values(), key=lambda x: x["key"]):
         print(json.dumps(e, ensure_ascii=False))
 
 
 def cmd_clear(args):
     entries = load_memory()
+    set_result({'deleted': len(entries)})
     if not entries:
         print("No memory entries to clear.")
         return
@@ -181,6 +186,7 @@ def cmd_clear(args):
 # CLI
 # ---------------------------------------------------------------------------
 
+@command(scoped=True)
 def main():
     parser = argparse.ArgumentParser(
         description="Persistent memory across sessions and AI providers",
@@ -218,4 +224,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

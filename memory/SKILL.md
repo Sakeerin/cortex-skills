@@ -19,6 +19,10 @@ Activate when the user wants to:
 
 ## Usage
 
+Use `--scope project` or `--scope session --scope-session ID` to isolate memory keys,
+and `--json` for structured output. Global remains the default; scopes do not inherit.
+See [scope and CLI contract](../docs/cli-contract.md).
+
 ```bash
 python3 ~/.ai-skills/memory/scripts/memory.py <command>
 # or via wrapper:

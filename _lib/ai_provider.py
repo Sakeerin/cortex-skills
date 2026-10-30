@@ -12,12 +12,12 @@ import urllib.request
 from pathlib import Path
 
 try:
-    from env_loader import get, load_env
+    from env_loader import load_env
 except ImportError:
     import sys
 
     sys.path.insert(0, str(Path(__file__).parent))
-    from env_loader import get, load_env
+    from env_loader import load_env
 
 SUPPORTED = ["claude", "gemini", "openai", "ollama", "mistral", "lmstudio"]
 LOCAL_PROVIDERS = {"ollama", "lmstudio"}
@@ -151,7 +151,7 @@ def detect() -> str:
     if os.environ.get("MISTRAL_API_KEY"):
         return "mistral"
 
-    model = get_model()
+    model = os.environ.get('AI_MODEL', 'unknown')
     if model != "unknown":
         for prefix, hinted_provider in _MODEL_PROVIDER_HINTS.items():
             if model.lower().startswith(prefix):
@@ -241,11 +241,8 @@ def get_session_dir(provider: str | None = None) -> Path | None:
 
 
 def get_data_dir() -> Path:
-    load_env()
-    raw = os.environ.get("AI_SKILLS_DATA_DIR", str(Path.home() / ".ai-skills-data"))
-    path = Path(raw).expanduser()
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    from env_loader import get_data_dir as scoped_data_dir
+    return scoped_data_dir()
 
 
 def get_provider_details(provider: str | None = None) -> dict[str, object]:
@@ -358,7 +355,7 @@ def test_provider(provider: str | None = None, timeout: int = 5) -> dict[str, ob
     elif provider in {"openai", "mistral"} and api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "gemini" and api_key:
-        endpoint += ("&" if "?" in endpoint else "?") + f"key={api_key}"
+        headers['x-goog-api-key'] = api_key
 
     if provider not in LOCAL_PROVIDERS and not api_key:
         return {"provider": provider, "ok": False, "message": "Missing API key"}

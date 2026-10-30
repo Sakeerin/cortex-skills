@@ -20,7 +20,8 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from ai_provider import detect, get_context_limit, get_context_table, get_model
+from ai_provider import detect, get_context_limit, get_context_table, get_model  # noqa: E402
+from cli import command, set_result, CLIError, NOT_FOUND  # noqa: E402
 
 
 def _format_int(value: int) -> str:
@@ -32,8 +33,7 @@ def cmd_show(args) -> None:
     provider = detect()
     limit = get_context_limit(model)
     if limit == 0:
-        print(f"Unknown model: {model}", file=sys.stderr)
-        raise SystemExit(1)
+        raise CLIError(f'Unknown model: {model}', NOT_FOUND)
 
     used = args.used
     if used is None and os.environ.get("AI_CONTEXT_USED_TOKENS"):
@@ -42,6 +42,11 @@ def cmd_show(args) -> None:
     buffer_tokens = args.buffer
     if buffer_tokens is None:
         buffer_tokens = int(os.environ.get("AI_CONTEXT_BUFFER", "20000" if limit >= 100000 else "4000"))
+    if buffer_tokens < 0 or (used is not None and used < 0):
+        raise ValueError('Used and buffer tokens must be nonnegative')
+    set_result({'provider': provider, 'model': model, 'limit': limit, 'used': used,
+                'free': max(limit - used, 0) if used is not None else None,
+                'buffer': buffer_tokens})
 
     print(f"Context Window - {model}")
     print("-" * 50)
@@ -69,6 +74,7 @@ def cmd_show(args) -> None:
 
 
 def cmd_all(_args) -> None:
+    set_result(get_context_table())
     print("Known Context Limits")
     print("-" * 50)
     for model, limit in get_context_table().items():
@@ -85,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@command()
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -95,4 +102,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

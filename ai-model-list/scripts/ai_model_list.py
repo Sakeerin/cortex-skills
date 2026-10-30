@@ -22,7 +22,7 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from ai_provider import (
+from ai_provider import (  # noqa: E402
     PROVIDER_METADATA,
     detect,
     get_api_key,
@@ -30,6 +30,7 @@ from ai_provider import (
     get_context_limit,
     list_supported,
 )
+from cli import command, set_result, CLIError, UNAVAILABLE  # noqa: E402
 
 
 def _fetch_remote_models(provider: str) -> list[str] | None:
@@ -83,9 +84,10 @@ def get_models(provider: str) -> tuple[list[str], str]:
 def cmd_list(args) -> None:
     provider = args.provider or detect()
     if provider not in list_supported():
-        print(f"Unknown provider: {provider}", file=sys.stderr)
-        raise SystemExit(1)
+        raise CLIError(f'No supported provider configured: {provider}', UNAVAILABLE)
     models, source = get_models(provider)
+    set_result({'provider': provider, 'source': source,
+                'models': [{'name': model, 'context_limit': get_context_limit(model)} for model in models]})
     print(f"Models - {provider} ({source})")
     print("-" * 50)
     for model in models:
@@ -95,26 +97,31 @@ def cmd_list(args) -> None:
 
 
 def cmd_compare(_args) -> None:
+    results = []
     print("Provider Model Comparison")
     print("-" * 70)
     for provider in list_supported():
         models, source = get_models(provider)
+        results.extend({'provider': provider, 'model': model, 'source': source,
+                        'context_limit': get_context_limit(model)} for model in models)
         for model in models:
             limit = get_context_limit(model)
             limit_text = f"{limit:,}" if limit else "unknown"
             print(f"{provider:<10} {model:<24} context:{limit_text:<10} source:{source}")
+    set_result(results)
 
 
 def cmd_pull(args) -> None:
-    completed = subprocess.run(
-        ["ollama", "pull", args.model],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        completed = subprocess.run(
+            ["ollama", "pull", args.model],
+            check=False, capture_output=True, text=True,
+        )
+    except FileNotFoundError as exc:
+        raise CLIError('ollama executable not found', UNAVAILABLE) from exc
     if completed.returncode != 0:
-        print(completed.stderr.strip() or "ollama pull failed", file=sys.stderr)
-        raise SystemExit(completed.returncode)
+        raise CLIError(completed.stderr.strip() or 'ollama pull failed', UNAVAILABLE)
+    set_result({'model': args.model, 'pulled': True})
     print(completed.stdout.strip() or f"Pulled {args.model}")
 
 
@@ -126,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@command()
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -138,4 +146,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

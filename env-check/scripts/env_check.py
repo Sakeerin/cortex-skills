@@ -27,24 +27,30 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"                 # env-check/ -> repo-root/
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from env_loader import load_env, get, get_data_dir
-from ai_provider import detect as detect_provider, get_base_url, SUPPORTED
+from env_loader import load_env, get  # noqa: E402
+from ai_provider import detect as detect_provider, get_base_url, SUPPORTED  # noqa: E402
+from cli import command, set_result, CLIError, UNAVAILABLE, USAGE  # noqa: E402
+
+_checks = []
 
 # ---------------------------------------------------------------------------
 # Check helpers
 # ---------------------------------------------------------------------------
 
 def _ok(label: str, value: str = "") -> None:
+    _checks.append({'status': 'ok', 'label': label, 'message': value})
     suffix = f" = {value}" if value else ""
     print(f"✅  {label:<30}{suffix}")
 
 
 def _warn(label: str, msg: str = "") -> None:
+    _checks.append({'status': 'warning', 'label': label, 'message': msg})
     suffix = f"  ({msg})" if msg else ""
     print(f"⚠️   {label:<30}{suffix}")
 
 
 def _fail(label: str, msg: str = "") -> None:
+    _checks.append({'status': 'failed', 'label': label, 'message': msg})
     suffix = f"  ({msg})" if msg else ""
     print(f"❌  {label:<30}{suffix}")
 
@@ -190,7 +196,7 @@ def _check_lmstudio(show_fix: bool) -> None:
     base_url = get_base_url("lmstudio") or "http://localhost:1234"
     try:
         url = base_url.rstrip("/") + "/v1/models"
-        with urllib.request.urlopen(url, timeout=3) as resp:
+        with urllib.request.urlopen(url, timeout=3):
             _ok("LM Studio server", f"running at {base_url}")
     except Exception:
         _fail("LM Studio server", f"not reachable at {base_url}")
@@ -202,7 +208,9 @@ def _check_lmstudio(show_fix: bool) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
+@command()
 def main():
+    _checks.clear()
     parser = argparse.ArgumentParser(
         description="Check AI API keys and provider connectivity",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -237,8 +245,7 @@ def main():
             print()
     elif args.provider:
         if args.provider not in SUPPORTED:
-            print(f"Unknown provider '{args.provider}'. Supported: {', '.join(SUPPORTED)}", file=sys.stderr)
-            sys.exit(1)
+            raise CLIError(f"Unknown provider '{args.provider}'. Supported: {', '.join(SUPPORTED)}", USAGE)
         check_provider(args.provider, args.fix)
     else:
         # Default: check current provider
@@ -250,7 +257,10 @@ def main():
                 _fix("Run: echo 'AI_PROVIDER=claude' >> ~/.ai-skills.env")
         else:
             check_provider(current, args.fix)
+    set_result({'checks': list(_checks)})
+    if any(check['status'] == 'failed' for check in _checks):
+        raise CLIError('Environment checks failed', UNAVAILABLE)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
