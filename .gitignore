@@ -4,6 +4,7 @@ my-data/
 *.json
 !_templates/
 !cost-rates.json
+!model-registry.json
 
 # Environment / secrets
 .env

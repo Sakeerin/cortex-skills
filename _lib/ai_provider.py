@@ -19,8 +19,9 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent))
     from env_loader import load_env
 
-SUPPORTED = ["claude", "gemini", "openai", "ollama", "mistral", "lmstudio"]
-LOCAL_PROVIDERS = {"ollama", "lmstudio"}
+from model_registry import PROVIDERS, LOCAL_PROVIDERS, get_registry
+
+SUPPORTED = list(PROVIDERS)
 
 PROVIDER_METADATA = {
     "claude": {
@@ -32,7 +33,6 @@ PROVIDER_METADATA = {
         "session_dir": Path.home() / ".claude" / "projects",
         "default_base_url": "https://api.anthropic.com",
         "test_path": "/v1/models",
-        "known_models": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
     },
     "gemini": {
         "display_name": "Gemini CLI",
@@ -43,7 +43,6 @@ PROVIDER_METADATA = {
         "session_dir": Path.home() / ".gemini",
         "default_base_url": "https://generativelanguage.googleapis.com",
         "test_path": "/v1beta/models",
-        "known_models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
     },
     "openai": {
         "display_name": "OpenAI",
@@ -54,7 +53,6 @@ PROVIDER_METADATA = {
         "session_dir": None,
         "default_base_url": "https://api.openai.com/v1",
         "test_path": "/models",
-        "known_models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-5"],
     },
     "ollama": {
         "display_name": "Ollama",
@@ -65,7 +63,6 @@ PROVIDER_METADATA = {
         "session_dir": None,
         "default_base_url": "http://localhost:11434",
         "test_path": "/api/tags",
-        "known_models": ["llama3.3", "llama3.2", "codellama", "phi4"],
     },
     "mistral": {
         "display_name": "Mistral",
@@ -76,7 +73,6 @@ PROVIDER_METADATA = {
         "session_dir": None,
         "default_base_url": "https://api.mistral.ai/v1",
         "test_path": "/models",
-        "known_models": ["mistral-large", "mistral-small"],
     },
     "lmstudio": {
         "display_name": "LM Studio",
@@ -87,40 +83,8 @@ PROVIDER_METADATA = {
         "session_dir": None,
         "default_base_url": "http://localhost:1234/v1",
         "test_path": "/models",
-        "known_models": ["local-model"],
     },
 }
-
-_MODEL_PROVIDER_HINTS = {
-    "claude": "claude",
-    "gpt": "openai",
-    "gemini": "gemini",
-    "llama": "ollama",
-    "codellama": "ollama",
-    "phi": "ollama",
-    "mistral": "mistral",
-}
-
-_CONTEXT_LIMITS = {
-    "claude-opus-4-6": 200_000,
-    "claude-sonnet-4-6": 200_000,
-    "claude-haiku-4-5": 200_000,
-    "gpt-5": 400_000,
-    "gpt-4.1": 1_000_000,
-    "gpt-4o": 128_000,
-    "gpt-4o-mini": 128_000,
-    "gemini-2.5-pro": 1_000_000,
-    "gemini-2.5-flash": 1_000_000,
-    "gemini-1.5-pro": 1_000_000,
-    "llama3.3": 128_000,
-    "llama3.2": 128_000,
-    "codellama": 16_000,
-    "phi4": 16_000,
-    "mistral-large": 128_000,
-    "mistral-small": 32_000,
-    "local-model": 128_000,
-}
-
 
 def normalize_provider(provider: str | None) -> str:
     value = (provider or "").strip().lower()
@@ -129,6 +93,10 @@ def normalize_provider(provider: str | None) -> str:
 
 def list_supported() -> list[str]:
     return list(SUPPORTED)
+
+
+def get_known_models(provider: str) -> list[str]:
+    return get_registry().names(provider)
 
 
 def detect() -> str:
@@ -153,9 +121,9 @@ def detect() -> str:
 
     model = os.environ.get('AI_MODEL', 'unknown')
     if model != "unknown":
-        for prefix, hinted_provider in _MODEL_PROVIDER_HINTS.items():
-            if model.lower().startswith(prefix):
-                return hinted_provider
+        inferred = get_registry().infer_provider(model)
+        if inferred != 'unknown':
+            return inferred
 
     if (Path.home() / ".claude").exists():
         return "claude"
@@ -214,22 +182,23 @@ def get_base_url(provider: str | None = None) -> str | None:
     return PROVIDER_METADATA.get(provider, {}).get("default_base_url")
 
 
-def get_context_limit(model: str | None = None) -> int:
+def get_context_limit(model: str | None = None, provider: str | None = None) -> int:
     if model is None:
-        model = get_model()
-    model = (model or "").lower()
-    if not model:
-        return 0
-    if model in _CONTEXT_LIMITS:
-        return _CONTEXT_LIMITS[model]
-    for key, limit in _CONTEXT_LIMITS.items():
-        if model.startswith(key) or key.startswith(model.split("-")[0]):
-            return limit
-    return 0
+        selected = provider or detect()
+        provider = selected if selected != 'unknown' else None
+        model = get_model(provider)
+    row = get_registry().resolve(model, provider)
+    return row['context_window'] if row else 0
 
 
 def get_context_table() -> dict[str, int]:
-    return dict(sorted(_CONTEXT_LIMITS.items()))
+    rows = get_registry().list_models()
+    counts = {}
+    for row in rows:
+        key = row['id'].casefold()
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted((row['id'] if counts[row['id'].casefold()] == 1 else f"{row['provider']}/{row['id']}",
+                        row['context_window']) for row in rows))
 
 
 def get_session_dir(provider: str | None = None) -> Path | None:
@@ -266,7 +235,7 @@ def get_provider_details(provider: str | None = None) -> dict[str, object]:
         "session_dir": get_session_dir(provider),
         "cli_tool": meta["cli_tool"],
         "env_keys": list(meta["env_keys"]),
-        "known_models": list(meta["known_models"]),
+        "known_models": get_known_models(provider),
     }
 
 

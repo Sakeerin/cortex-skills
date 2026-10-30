@@ -14,11 +14,14 @@ List models for the active provider, compare built-in catalogs across providers,
 ai-model-list
 ai-model-list --provider openai
 ai-model-list --provider ollama
+ai-model-list --provider openai --offline --json
 ai-model-list --compare
 ai-model-list --pull llama3.3
 ```
 
 ## Notes
 
-- For remote providers, the command tries a live API listing first and falls back to the built-in catalog.
+- The command tries a live API listing first and falls back to the shared offline registry.
+- Use `--offline` to avoid network calls. Catalog metadata and custom models are managed with
+  `cortex models`; see [model registry](../docs/model-registry.md).
 - `--pull` shells out to `ollama pull`, so it is only relevant for local Ollama usage.

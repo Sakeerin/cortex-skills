@@ -29,7 +29,7 @@ from file_lock import data_lock
 
 DATA_FILES = (
     "todos.jsonl", "notes.jsonl", "memory.jsonl", "cost-log.jsonl",
-    "prompts.json", "budget.json", "usage-import-state.json",
+    "prompts.json", "budget.json", "usage-import-state.json", "model-overrides.json",
 )
 MAX_TOTAL_SIZE = 256 * 1024 * 1024
 MAX_MANIFEST_SIZE = 64 * 1024
@@ -209,6 +209,12 @@ def validate_cost_event(event: object) -> str | None:
 def _document_error(name: str, obj: object) -> str | None:
     if not isinstance(obj, dict):
         return "Expected a JSON object"
+    if name == 'model-overrides.json':
+        from model_registry import validate_registry
+        try:
+            validate_registry(obj, overrides=True)
+        except ValueError as exc:
+            return str(exc)
     if name == "prompts.json":
         for key, entry in obj.items():
             if (not isinstance(entry, dict) or entry.get("name") != key

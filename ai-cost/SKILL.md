@@ -41,7 +41,10 @@ ai-cost today --no-import
 - Unknown model prices, missing cache rates, and tool-use pricing produce `cost_usd: null`
   and `pricing_status: unknown`. Reports warn and exclude these records from USD totals,
   while retaining tokens. Optional per-million `cache_read` / `cache_write` rates can be added
-  to the model's `cost-rates.json` entry. Prices are estimates from the configured rate table.
+  through `cortex models set` or the legacy `cost-rates.json` overlay. Prices are estimates
+  from the [shared model registry](../docs/model-registry.md), not live provider invoices.
+- Unknown manual-log prices also remain `null`, not silently free. Model names alone never
+  imply free local usage when a remote provider is selected.
 - Before changing an existing cost log, import creates an `ai-data` compatible safety backup.
   `--dry-run` previews import without writing. Import warnings return exit code 5 for explicit imports.
 - All commands accept `--json` using the shared envelope (`data` contains the report).

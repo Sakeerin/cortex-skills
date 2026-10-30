@@ -24,6 +24,7 @@ from ai_provider import (  # noqa: E402
     detect,
     get_base_url_env_key,
     get_context_limit,
+    get_known_models,
     get_provider_details,
     list_supported,
     set_provider,
@@ -39,7 +40,7 @@ def cmd_status(_args) -> None:
     print("-" * 50)
     print(f"Provider:    {details['display_name']} ({details['provider']})")
     print(f"Model:       {details['model']}")
-    print(f"Context:     {get_context_limit(details['model']) or 'unknown'}")
+    print(f"Context:     {get_context_limit(details['model'], details['provider'] if details['provider'] != 'unknown' else None) or 'unknown'}")
     print(f"Base URL:    {details['base_url'] or 'n/a'}")
     print(f"Local:       {'yes' if details['local'] else 'no'}")
     print(f"Session dir: {details['session_dir'] or 'n/a'}")
@@ -54,10 +55,11 @@ def cmd_list(_args) -> None:
     print("-" * 50)
     for provider in list_supported():
         meta = PROVIDER_METADATA[provider]
+        known = get_known_models(provider)
         marker = "*" if provider == current else " "
         print(
             f"{marker} {provider:<9}  {meta['display_name']:<14}  "
-            f"cli:{meta['cli_tool']:<8}  default:{meta['known_models'][0]}"
+            f"cli:{meta['cli_tool']:<8}  catalog:{known[0] if known else 'none'}"
         )
 
 

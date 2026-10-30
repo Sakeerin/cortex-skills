@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "provider_prefixes": {
+    "claude": "claude", "gpt": "openai", "gemini": "gemini",
+    "llama": "ollama", "codellama": "ollama", "phi": "ollama", "mistral": "mistral"
+  },
+  "models": [
+    {"provider": "claude", "id": "claude-opus-4-6", "context_window": 200000, "aliases": [], "match_suffix": true, "rates": {"input": 15.0, "output": 75.0}},
+    {"provider": "claude", "id": "claude-sonnet-4-6", "context_window": 200000, "aliases": [], "match_suffix": true, "rates": {"input": 3.0, "output": 15.0}},
+    {"provider": "claude", "id": "claude-haiku-4-5", "context_window": 200000, "aliases": [], "match_suffix": true, "rates": null},
+    {"provider": "gemini", "id": "gemini-2.5-pro", "context_window": 1000000, "aliases": [], "match_suffix": true, "rates": {"input": 1.25, "output": 10.0}},
+    {"provider": "gemini", "id": "gemini-2.5-flash", "context_window": 1000000, "aliases": [], "match_suffix": true, "rates": {"input": 0.3, "output": 2.5}},
+    {"provider": "gemini", "id": "gemini-1.5-pro", "context_window": 1000000, "aliases": [], "match_suffix": true, "rates": null},
+    {"provider": "openai", "id": "gpt-4o", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 2.5, "output": 10.0}},
+    {"provider": "openai", "id": "gpt-4o-mini", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 0.15, "output": 0.6}},
+    {"provider": "openai", "id": "gpt-4.1", "context_window": 1000000, "aliases": [], "match_suffix": true, "rates": {"input": 2.0, "output": 8.0}},
+    {"provider": "openai", "id": "gpt-5", "context_window": 400000, "aliases": [], "match_suffix": true, "rates": {"input": 1.25, "output": 10.0}},
+    {"provider": "ollama", "id": "llama3.3", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 0.0, "output": 0.0}},
+    {"provider": "ollama", "id": "llama3.2", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 0.0, "output": 0.0}},
+    {"provider": "ollama", "id": "codellama", "context_window": 16000, "aliases": [], "match_suffix": true, "rates": {"input": 0.0, "output": 0.0}},
+    {"provider": "ollama", "id": "phi4", "context_window": 16000, "aliases": [], "match_suffix": true, "rates": {"input": 0.0, "output": 0.0}},
+    {"provider": "mistral", "id": "mistral-large", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 2.0, "output": 8.0}},
+    {"provider": "mistral", "id": "mistral-small", "context_window": 32000, "aliases": [], "match_suffix": true, "rates": {"input": 0.2, "output": 0.6}},
+    {"provider": "lmstudio", "id": "local-model", "context_window": 128000, "aliases": [], "match_suffix": true, "rates": {"input": 0.0, "output": 0.0}}
+  ]
+}

@@ -26,7 +26,7 @@ from cli import command, set_result, CLIError, DATA_ERROR  # noqa: E402
 
 
 def _format_money(value: float) -> str:
-    return f"${value:,.4f}"
+    return f"${value:,.4f}" if value is not None else 'unknown'
 
 
 def _report_tracker(args):

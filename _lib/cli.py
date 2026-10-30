@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 from data_scope import DataScope, reset_scope, resolve_scope, set_scope
-from errors import DataError
+from errors import DataError, AmbiguousModelError
 
 SUCCESS = 0
 FAILURE = 1
@@ -102,6 +102,8 @@ def command(*, scoped=False):
                         code, message = CONFLICT, str(exc)
                     except (DataError, json.JSONDecodeError, UnicodeError) as exc:
                         code, message = DATA_ERROR, str(exc)
+                    except AmbiguousModelError as exc:
+                        code, message = CONFLICT, str(exc)
                     except ValueError as exc:
                         code, message = USAGE, str(exc)
                     except (TimeoutError, ConnectionError) as exc:

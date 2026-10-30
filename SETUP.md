@@ -26,6 +26,10 @@ Complete installation and configuration guide for all supported AI providers.
 
 ## Prerequisites
 
+The central administration CLI is available as `python3 cortex.py status`,
+`cortex status` after PATH setup, or `.\cortex.cmd status` on Windows.
+See [central CLI](docs/central-cli.md) and [user model configuration](docs/model-registry.md).
+
 For project/session data separation and machine-readable automation, see the
 [CLI contract](docs/cli-contract.md). Configure `AI_SKILLS_SCOPE`,
 `AI_SKILLS_PROJECT_DIR`, and `AI_SKILLS_SESSION_ID`, or pass scope flags per command.

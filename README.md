@@ -35,6 +35,22 @@ python3 ~/.ai-skills/env-check/scripts/env_check.py --fix
 
 ---
 
+## Central Administration
+
+```bash
+cortex status --json
+cortex doctor
+cortex skills validate --all
+cortex models list --provider openai --json
+cortex models set team-model --provider openai --context 64000 --input 1 --output 2
+cortex data backup --scope project
+```
+
+Without PATH setup: `python3 cortex.py status` or, on Windows, `.\cortex.cmd status`.
+The shared offline [model registry](docs/model-registry.md) now powers model discovery,
+context limits and cost estimates. See the [central CLI guide](docs/central-cli.md)
+for administration and routing existing skill commands.
+
 ## Skills
 
 | Skill | Description | Invoke |

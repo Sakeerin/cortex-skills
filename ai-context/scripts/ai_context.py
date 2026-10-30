@@ -20,7 +20,7 @@ _LIB_DIR = _SKILL_DIR.parent / "_lib"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 
-from ai_provider import detect, get_context_limit, get_context_table, get_model  # noqa: E402
+from ai_provider import detect, get_context_limit, get_context_table, get_model, list_supported  # noqa: E402
 from cli import command, set_result, CLIError, NOT_FOUND  # noqa: E402
 
 
@@ -29,9 +29,10 @@ def _format_int(value: int) -> str:
 
 
 def cmd_show(args) -> None:
-    model = args.model or get_model()
-    provider = detect()
-    limit = get_context_limit(model)
+    model = args.model or get_model(args.provider)
+    provider = args.provider or detect()
+    lookup_provider = args.provider or (provider if not args.model and provider != 'unknown' else None)
+    limit = get_context_limit(model, lookup_provider)
     if limit == 0:
         raise CLIError(f'Unknown model: {model}', NOT_FOUND)
 
@@ -84,6 +85,7 @@ def cmd_all(_args) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Show model context window information")
     parser.add_argument("--model", help="Model name to inspect")
+    parser.add_argument('--provider', choices=list_supported(), help='Disambiguate a registry model provider')
     parser.add_argument("--used", type=int, help="Used tokens in the current context")
     parser.add_argument("--buffer", type=int, help="Safety buffer before compacting")
     parser.add_argument("--last-message", help="Most recent user or assistant message")

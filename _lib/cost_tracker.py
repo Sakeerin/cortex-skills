@@ -18,20 +18,7 @@ from data_scope import current_scope
 from errors import DataError
 from data_manager import validate_document
 
-DEFAULT_RATES = {
-    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
-    "claude-opus-4-6": {"input": 15.0, "output": 75.0},
-    "gpt-4o": {"input": 2.5, "output": 10.0},
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    "gpt-4.1": {"input": 2.0, "output": 8.0},
-    "gpt-5": {"input": 1.25, "output": 10.0},
-    "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
-    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
-    "mistral-large": {"input": 2.0, "output": 6.0},
-    "mistral-small": {"input": 0.2, "output": 0.6},
-}
-
-FREE_PROVIDER_PREFIXES = ("ollama", "lmstudio", "llama", "codellama", "phi")
+from model_registry import get_registry
 
 
 def now_iso() -> str:
@@ -46,59 +33,31 @@ class CostTracker:
         self.log_path = self.data_dir / "cost-log.jsonl"
         self.budget_path = self.data_dir / "budget.json"
         self.rate_path = Path(__file__).resolve().parent.parent / "cost-rates.json"
-        self._rates_cache: dict[str, dict[str, float]] | None = None
-        self._rates_signature: tuple | None = None
+        self._registry = get_registry(rate_path=self.rate_path)
         self._events_cache: list[dict[str, object]] | None = None
         self._events_signature: tuple | None = None
         self._budgets_cache: dict[str, object] | None = None
         self._budgets_signature: tuple | None = None
 
     def load_rates(self) -> dict[str, dict[str, float]]:
-        signature = self._file_signature(self.rate_path)
-        if self._rates_cache is not None and self._rates_signature == signature:
-            return dict(self._rates_cache)
+        return self.registry.rate_table()
 
-        rates = dict(DEFAULT_RATES)
-        if self.rate_path.exists():
-            try:
-                payload = json.loads(self.rate_path.read_text(encoding="utf-8"))
-                for model, model_rates in payload.items():
-                    if isinstance(model_rates, dict):
-                        rates[model.lower()] = {
-                            "input": float(model_rates.get("input", 0.0)),
-                            "output": float(model_rates.get("output", 0.0)),
-                        }
-                        for key in ('cache_read', 'cache_write'):
-                            if key in model_rates:
-                                rates[model.lower()][key] = float(model_rates[key])
-            except (json.JSONDecodeError, ValueError):
-                pass
+    @property
+    def registry(self):
+        # Keep one configuration snapshot per tracker, while preserving the
+        # legacy rate_path override used by integrations and isolated tests.
+        if self._registry.rate_path != self.rate_path:
+            self._registry = get_registry(rate_path=self.rate_path)
+        return self._registry
 
-        self._rates_cache = dict(rates)
-        self._rates_signature = signature
-        return dict(rates)
+    def pricing_signature(self):
+        return self.registry.signature()
 
     def get_rate(self, model: str, provider: str | None = None) -> dict[str, float]:
-        model_key = (model or "").lower()
-        provider_key = (provider or "").lower()
-        if provider_key in {"ollama", "lmstudio"}:
-            return {"input": 0.0, "output": 0.0}
-        if any(model_key.startswith(prefix) for prefix in FREE_PROVIDER_PREFIXES):
-            return {"input": 0.0, "output": 0.0}
-        rates = self.load_rates()
-        if model_key in rates:
-            return rates[model_key]
-        for known in sorted(rates, key=len, reverse=True):
-            if model_key.startswith(known + '-') or model_key.startswith(known + ':'):
-                return rates[known]
-        return {"input": 0.0, "output": 0.0}
+        return self.registry.rate(model, provider) or {'input': 0.0, 'output': 0.0}
 
     def has_rate(self, model: str, provider: str) -> bool:
-        if provider in {'ollama', 'lmstudio'}:
-            return True
-        model = model.lower()
-        return any(model == key or model.startswith(key + '-') or model.startswith(key + ':')
-                   for key in self.load_rates())
+        return self.registry.rate(model, provider) is not None
 
     def estimate_cost(
         self,
@@ -107,7 +66,13 @@ class CostTracker:
         input_tokens: int,
         output_tokens: int,
     ) -> float:
-        rate = self.get_rate(model, provider)
+        return self.price_usage(provider, model, input_tokens, output_tokens) or 0.0
+
+    def price_usage(self, provider: str, model: str, input_tokens: int, output_tokens: int) -> float | None:
+        """Resolve availability and prices from the same registry snapshot."""
+        rate = self.registry.rate(model, provider)
+        if rate is None:
+            return None
         return round(
             (input_tokens * rate["input"] / 1_000_000)
             + (output_tokens * rate["output"] / 1_000_000),
@@ -134,7 +99,7 @@ class CostTracker:
             if session_id is not None and session_id != scope.session:
                 raise ValueError('--session-id must match the selected session scope')
             session_id = scope.session
-        cost_usd = self.estimate_cost(provider, model, input_tokens, output_tokens)
+        cost_usd = self.price_usage(provider, model, input_tokens, output_tokens)
         event = {
             "id": str(uuid.uuid4()),
             "timestamp": timestamp or now_iso(),
@@ -144,6 +109,7 @@ class CostTracker:
             "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
             "cost_usd": cost_usd,
+            "pricing_status": 'estimated' if cost_usd is not None else 'unknown',
             "session_id": session_id or "default",
             "metadata": metadata or {},
         }
@@ -154,7 +120,8 @@ class CostTracker:
             with self.log_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event, ensure_ascii=False) + "\n")
             self.invalidate_events()
-            self._increment_session_spend(cost_usd)
+            if cost_usd is not None:
+                self._increment_session_spend(cost_usd)
         return event
 
     def invalidate_events(self) -> None:

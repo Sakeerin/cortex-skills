@@ -139,8 +139,9 @@ def _merge(left, right):
 
 def _price(event, tracker):
     meta = event['metadata']
-    rate = tracker.get_rate(event['model'], event['provider'])
-    known = tracker.has_rate(event['model'], event['provider'])
+    rate = tracker.registry.rate(event['model'], event['provider'])
+    known = rate is not None
+    rate = rate or {'input': 0.0, 'output': 0.0}
     for field, key in (('cache_read_tokens', 'cache_read'), ('cache_write_tokens', 'cache_write')):
         if meta[field] and key not in rate:
             known = False
@@ -262,7 +263,8 @@ class UsageImporter:
                         raise DataError('Invalid cost log; run ai-data doctor before importing') from exc
         indexes = {event['id']: index for index, event in enumerate(events)}
         old_signature = _signature(log_path) if log_path.exists() else None
-        rate_signature = _signature(self.tracker.rate_path) if self.tracker.rate_path.exists() else None
+        # JSON normalizes tuples into arrays; compare the same shape on reload.
+        rate_signature = json.loads(json.dumps(self.tracker.pricing_signature()))
         state = {}
         if self.state_path.exists():
             try:

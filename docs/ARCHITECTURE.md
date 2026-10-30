@@ -77,6 +77,14 @@ Skills that need AI (e.g., future summarization skills) use `_lib/ai_provider.py
 | `data_scope.py` | Canonical project/session identities and isolated hashed storage namespaces |
 | `cli.py` | Invocation-local scope flags, structured result envelopes, and shared exit codes |
 | `errors.py` | Domain data-validation errors independent of output formatting |
+| `model_registry.py` | Versioned catalog, global user overrides, aliases, context and pricing |
+| `system_admin.py` | Offline runtime/skill/data health checks and safe Python route inventory |
+
+`cortex.py` is the shared administrative entrypoint. Existing handlers are routed
+inside its common CLI boundary rather than spawning shell commands or emitting
+nested JSON. `model-registry.json` contains bundled model metadata;
+`cost-rates.json` remains a legacy price-only overlay, followed by global user overrides.
+See [registry](model-registry.md) and [central CLI](central-cli.md) for schemas and routing.
 
 Scope context uses `ContextVar` and is reset after every CLI invocation, including
 failures, so in-process callers cannot inherit the preceding command's scope.

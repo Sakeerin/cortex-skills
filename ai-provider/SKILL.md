@@ -21,6 +21,9 @@ ai-provider test --provider openai
 
 ## Notes
 
+- Model catalogs and provider inference use the [central model registry](../docs/model-registry.md).
+  Existing commands are also available through `cortex provider ...`.
+
 - `set` writes to `.ai-skills.env` in the current project by default.
 - Use `--global` to write to `~/.ai-skills.env` instead.
 - Remote provider tests require the matching API key to be present.

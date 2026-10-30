@@ -86,6 +86,8 @@ and historical imports do not increment it. Unknown prices remain excluded with 
 ## JSON Contract
 
 All **16 Python skill CLIs** accept `--json`, including help and error paths.
+The [central `cortex` CLI](central-cli.md) uses the same envelope and codes for
+administration and forwarded commands, without nesting envelopes.
 The shell-only `sync-git` and `time`/`date` retain their existing interfaces.
 Stdout contains exactly one UTF-8 JSON document, without banners, progress text,
 ANSI escapes or tracebacks. Warnings are included in the envelope, not stderr.

@@ -262,6 +262,8 @@ setup_path() {
     fi
 
     local path_snippet="# cortex-skills PATH
+# cortex-skills admin CLI
+export PATH=\"$INSTALL_DIR:\$PATH\"
 for _d in \"$INSTALL_DIR\"/*/; do
   [[ -d \"\$_d\" ]] && export PATH=\"\$_d:\$PATH\"
 done"
@@ -269,6 +271,10 @@ done"
     if [[ -n "$shell_rc" ]]; then
         if grep -q "cortex-skills PATH" "$shell_rc" 2>/dev/null; then
             info "PATH already configured in $shell_rc"
+            if ! grep -q 'cortex-skills admin CLI' "$shell_rc"; then
+                printf '\n# cortex-skills admin CLI\nexport PATH="%s:$PATH"\n' "$INSTALL_DIR" >> "$shell_rc"
+                success "Added central cortex CLI to PATH in $shell_rc"
+            fi
         else
             echo "" >> "$shell_rc"
             echo "$path_snippet" >> "$shell_rc"
@@ -305,6 +311,7 @@ main() {
     echo ""
 
     install_repo_runtime || exit 1
+    [[ -f "$INSTALL_DIR/cortex" ]] && chmod +x "$INSTALL_DIR/cortex"
 
     local failed=()
     for skill in "${SELECTED_SKILLS[@]}"; do
@@ -324,9 +331,10 @@ main() {
 
     echo ""
     header "Next Steps"
-    echo "  1. Run: env-check --fix       (verify your API keys)"
-    echo "  2. Run: todo list             (test the todo skill)"
-    echo "  3. Run: memory context        (generate AI system prompt context)"
+    echo "  1. Run: cortex status         (central administration CLI)"
+    echo "  2. Run: env-check --fix        (verify your API keys)"
+    echo "  3. Run: todo list              (test the todo skill)"
+    echo "  4. Run: memory context         (generate AI system prompt context)"
     echo ""
     info "Full docs: $INSTALL_DIR/README.md"
 }

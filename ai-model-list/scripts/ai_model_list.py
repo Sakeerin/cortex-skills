@@ -28,6 +28,7 @@ from ai_provider import (  # noqa: E402
     get_api_key,
     get_base_url,
     get_context_limit,
+    get_known_models,
     list_supported,
 )
 from cli import command, set_result, CLIError, UNAVAILABLE  # noqa: E402
@@ -48,7 +49,7 @@ def _fetch_remote_models(provider: str) -> list[str] | None:
     elif provider in {"openai", "mistral"} and api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     elif provider == "gemini" and api_key:
-        endpoint += ("&" if "?" in endpoint else "?") + f"key={api_key}"
+        headers['x-goog-api-key'] = api_key
     elif provider not in {"ollama", "lmstudio"}:
         return None
 
@@ -74,38 +75,38 @@ def _fetch_remote_models(provider: str) -> list[str] | None:
     return None
 
 
-def get_models(provider: str) -> tuple[list[str], str]:
-    live_models = _fetch_remote_models(provider)
+def get_models(provider: str, offline: bool = False) -> tuple[list[str], str]:
+    live_models = None if offline else _fetch_remote_models(provider)
     if live_models:
         return sorted(set(live_models)), "live"
-    return PROVIDER_METADATA[provider]["known_models"], "catalog"
+    return get_known_models(provider), "catalog"
 
 
 def cmd_list(args) -> None:
     provider = args.provider or detect()
     if provider not in list_supported():
         raise CLIError(f'No supported provider configured: {provider}', UNAVAILABLE)
-    models, source = get_models(provider)
+    models, source = get_models(provider, args.offline)
     set_result({'provider': provider, 'source': source,
-                'models': [{'name': model, 'context_limit': get_context_limit(model)} for model in models]})
+                'models': [{'name': model, 'context_limit': get_context_limit(model, provider)} for model in models]})
     print(f"Models - {provider} ({source})")
     print("-" * 50)
     for model in models:
-        limit = get_context_limit(model)
+        limit = get_context_limit(model, provider)
         limit_text = f"{limit:,}" if limit else "unknown"
         print(f"{model:<24} context:{limit_text}")
 
 
-def cmd_compare(_args) -> None:
+def cmd_compare(args) -> None:
     results = []
     print("Provider Model Comparison")
     print("-" * 70)
     for provider in list_supported():
-        models, source = get_models(provider)
+        models, source = get_models(provider, args.offline)
         results.extend({'provider': provider, 'model': model, 'source': source,
-                        'context_limit': get_context_limit(model)} for model in models)
+                        'context_limit': get_context_limit(model, provider)} for model in models)
         for model in models:
-            limit = get_context_limit(model)
+            limit = get_context_limit(model, provider)
             limit_text = f"{limit:,}" if limit else "unknown"
             print(f"{provider:<10} {model:<24} context:{limit_text:<10} source:{source}")
     set_result(results)
@@ -128,6 +129,7 @@ def cmd_pull(args) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="List models for AI providers")
     parser.add_argument("--provider", choices=list_supported(), help="Provider to inspect")
+    parser.add_argument('--offline', action='store_true', help='Use the central catalog without network requests')
     parser.add_argument("--compare", action="store_true", help="Compare models across providers")
     parser.add_argument("--pull", metavar="MODEL", help="Pull an Ollama model")
     return parser

@@ -39,6 +39,8 @@ namespace, never child scopes. Global remains the default. See [CLI contract](..
 - Malformed JSON documents are reported for manual recovery, rather than replaced with empty data.
 - Default archives are saved in `backups/` inside `AI_SKILLS_DATA_DIR`.
 - Supported files: `todos.jsonl`, `notes.jsonl`, `memory.jsonl`, `cost-log.jsonl`,
-  `prompts.json`, `budget.json`, and `usage-import-state.json`. Archives are limited
+  `prompts.json`, `budget.json`, `usage-import-state.json`, and `model-overrides.json`. Archives are limited
   to 256 MiB of uncompressed data. Quarantine files and old backups are not recursively archived.
 - Archives are not encrypted. Keep them private because notes and memory can contain sensitive data.
+- Default global model overrides are backed up in global scope. Custom `AI_MODEL_REGISTRY`
+  paths and the bundled catalog are outside the backup allowlist; export them explicitly.

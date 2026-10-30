@@ -21,7 +21,7 @@ add another request. Repeated streaming records use the highest recorded token c
 Newly recorded usage for an existing request updates it in place. Interrupted imports can
 be repeated: the cost log is the identity ledger, not a separately maintained counter.
 
-`usage-import-state.json` caches unchanged file signatures. Changing the log or rate table
+`usage-import-state.json` caches unchanged file signatures. Changing the log or registry sources
 invalidates this cache. The cache is included in backups; deleting it only triggers a rescan.
 Malformed/incomplete source lines are reported and retried. Other valid requests still import.
 An invalid existing cost log blocks import; inspect it with `ai-data doctor` first.
@@ -32,7 +32,8 @@ Input/output counts are retained with recorded timestamp, model, provider, and s
 Claude cached reads and writes are added to input token totals and retained separately.
 Gemini cached input is a subset of prompt input; thoughts are included in output.
 Cache rates are used only when explicitly present as per-million `cache_read` / `cache_write`
-fields in the model rate entry. Unknown model/cache/tool pricing remains `null` and is excluded
+fields in the shared [model registry](model-registry.md) (including user/legacy overrides).
+Unknown model/cache/tool pricing remains `null` and is excluded
 from monetary totals with a visible warning. Totals with unpriced records are incomplete.
 Claude `server_tool_use` request counts are retained separately and make the request's price
 unknown until server-tool pricing is supported; they are not silently counted as token-only charges.

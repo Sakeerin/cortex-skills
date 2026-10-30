@@ -17,6 +17,11 @@ also support `--scope global|project|session` and `--scope-session ID`; global i
 backwards-compatible default. See [CLI contract](docs/cli-contract.md) for examples,
 scope isolation, configuration, and JSON migration notes.
 
+Use `cortex status`, `cortex doctor`, `cortex skills validate --all`, and
+`cortex models list` for [central administration](docs/central-cli.md).
+Model discovery, context windows and cost estimates use the same
+[model registry](docs/model-registry.md); existing standalone skill commands remain available.
+
 ---
 
 ## Skills ที่มีทั้งหมด
