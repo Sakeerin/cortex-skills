@@ -220,6 +220,12 @@ def _document_error(name: str, obj: object) -> str | None:
             if (not isinstance(entry, dict) or entry.get("name") != key
                     or not isinstance(entry.get("content"), str)):
                 return "Prompt entries require name matching key and string content"
+            for field in ('description', 'created_at', 'updated_at'):
+                if field in entry and not isinstance(entry[field], str):
+                    return f"Prompt {key!r}: {field} must be a string"
+            if 'tags' in entry and (not isinstance(entry['tags'], list)
+                                    or any(not isinstance(tag, str) for tag in entry['tags'])):
+                return f"Prompt {key!r}: tags must be a list of strings"
     elif name == "budget.json":
         for field in ("daily", "session", "monthly"):
             if obj.get(field) is not None and not _number(obj[field]):

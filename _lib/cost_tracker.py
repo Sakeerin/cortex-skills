@@ -268,28 +268,33 @@ class CostTracker:
             raise ValueError(f'Unsupported budget type: {budget_type}')
         if not math.isfinite(float(amount)) or amount < 0:
             raise ValueError('Budget must be a finite, nonnegative amount')
-        budgets = self.get_budgets()
-        budgets[budget_type] = round(float(amount), 2)
-        self.save_budgets(budgets)
+        with data_lock(self.data_dir):
+            budgets = self.get_budgets()
+            budgets[budget_type] = round(float(amount), 2)
+            self.save_budgets(budgets)
         return budgets
 
     def set_alert_threshold(self, threshold: int) -> dict[str, object]:
         if not 0 <= threshold <= 100:
             raise ValueError('Alert threshold must be between 0 and 100')
-        budgets = self.get_budgets()
-        budgets["alert_threshold"] = int(threshold)
-        self.save_budgets(budgets)
+        with data_lock(self.data_dir):
+            budgets = self.get_budgets()
+            budgets["alert_threshold"] = int(threshold)
+            self.save_budgets(budgets)
         return budgets
 
     def reset_budget(self, budget_type: str) -> dict[str, object]:
-        budgets = self.get_budgets()
-        if budget_type == "session":
-            budgets["session_spend"] = 0.0
-            if self.scope.kind == 'session':
-                budgets['session_baseline'] = self._session_total()
-        else:
-            budgets[budget_type] = None
-        self.save_budgets(budgets)
+        if budget_type not in {'daily', 'session', 'monthly'}:
+            raise ValueError(f'Unsupported budget type: {budget_type}')
+        with data_lock(self.data_dir):
+            budgets = self.get_budgets()
+            if budget_type == "session":
+                budgets["session_spend"] = 0.0
+                if self.scope.kind == 'session':
+                    budgets['session_baseline'] = self._session_total()
+            else:
+                budgets[budget_type] = None
+            self.save_budgets(budgets)
         return budgets
 
     def check_budget(self, budget_type: str) -> tuple[float, float | None, bool]:
@@ -308,9 +313,10 @@ class CostTracker:
         return round(used, 6), (float(limit) if limit is not None else None), exceeded
 
     def _increment_session_spend(self, amount: float) -> None:
-        budgets = self.get_budgets()
-        budgets["session_spend"] = round(float(budgets.get("session_spend", 0.0)) + amount, 6)
-        self.save_budgets(budgets)
+        with data_lock(self.data_dir):
+            budgets = self.get_budgets()
+            budgets["session_spend"] = round(float(budgets.get("session_spend", 0.0)) + amount, 6)
+            self.save_budgets(budgets)
 
     def _session_total(self) -> float:
         return sum(self.event_cost(event) for event in self.load_events()

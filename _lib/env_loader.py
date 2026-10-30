@@ -2,10 +2,11 @@
 """
 env_loader.py — Load AI Skills config from .env files
 
-Search order:
-  1. ~/.ai-skills.env
+Priority (first defined value wins):
+  1. Existing shell environment
   2. .ai-skills.env  (current directory)
   3. .env            (current directory, fallback)
+  4. ~/.ai-skills.env (global fallback)
 
 Usage:
   from env_loader import load_env, get, require
@@ -31,13 +32,7 @@ def load_env() -> None:
 
     _unload_previous_file_values()
 
-    candidates = [
-        Path.home() / ".ai-skills.env",
-        Path.cwd() / ".ai-skills.env",
-        Path.cwd() / ".env",
-    ]
-
-    for path in candidates:
+    for path in _config_paths():
         if path.exists():
             _parse_env_file(path)
 
@@ -45,14 +40,17 @@ def load_env() -> None:
     _loaded_signature = signature
 
 
-def _get_signature() -> tuple:
-    candidates = [
-        Path.home() / ".ai-skills.env",
+def _config_paths() -> list[Path]:
+    return [
         Path.cwd() / ".ai-skills.env",
         Path.cwd() / ".env",
+        Path.home() / ".ai-skills.env",
     ]
+
+
+def _get_signature() -> tuple:
     signature = [str(Path.cwd().resolve())]
-    for path in candidates:
+    for path in _config_paths():
         resolved = path.resolve()
         if path.exists():
             stat = path.stat()

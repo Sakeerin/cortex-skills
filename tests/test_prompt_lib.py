@@ -2,6 +2,8 @@
 
 import json
 import sys
+from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -81,3 +83,75 @@ def test_extract_vars():
     from prompt_lib import extract_vars
     vars_ = extract_vars("Hello {{name}}, review {{code}} in {{language}}")
     assert set(vars_) == {"name", "code", "language"}
+
+
+@pytest.mark.parametrize('incoming', [
+    [], None, {'bad': {}}, {'bad': {'name': 'other', 'content': 'text'}},
+    {'bad': {'name': 'bad', 'content': 1}},
+    *[{'bad': {'name': 'bad', 'content': 'text', field: value}}
+      for field, value in [('tags', 'tag'), ('tags', [1]), ('description', None),
+                           ('created_at', 1), ('updated_at', [])]],
+])
+@pytest.mark.parametrize('existing', [False, True])
+def test_invalid_import_is_atomic(data_dir, monkeypatch, capsys, incoming, existing):
+    pl = _get_module(data_dir)
+    destination = pl.get_prompts_file()
+    if existing:
+        pl.save_prompts({'old': {'name': 'old', 'content': 'keep'}})
+    before = destination.read_bytes() if existing else None
+    source = data_dir / 'import.json'
+    if isinstance(incoming, dict):
+        incoming = {'valid': {'name': 'valid', 'content': 'text'}, **incoming}
+    source.write_text(json.dumps(incoming), encoding='utf-8')
+    monkeypatch.setattr(sys, 'argv', ['prompt-lib', '--json', 'import', str(source), '--overwrite'])
+    with pytest.raises(SystemExit) as exc:
+        pl.main()
+    assert exc.value.code == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result['error']['code'] == 'invalid_data'
+    assert (destination.read_bytes() if destination.exists() else None) == before
+
+
+@pytest.mark.parametrize('change', ['unrelated', 'modified', 'deleted'])
+def test_editor_preserves_concurrent_changes(data_dir, monkeypatch, change):
+    from cli import CLIError
+    pl = _get_module(data_dir)
+    pl.save_prompts({'edit': {'name': 'edit', 'content': 'original'}})
+
+    def editor(command, **kwargs):
+        def mutate():
+            with pl.prompt_transaction() as prompts:
+                if change == 'unrelated':
+                    prompts['other'] = {'name': 'other', 'content': 'keep'}
+                elif change == 'modified':
+                    prompts['edit']['content'] = 'concurrent'
+                else:
+                    del prompts['edit']
+        # A separate writer must finish while the editor is still open.
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(mutate).result(timeout=5)
+        Path(command[1]).write_text('edited', encoding='utf-8')
+
+    monkeypatch.setattr(pl.subprocess, 'run', editor)
+    if change == 'unrelated':
+        pl.cmd_edit(SimpleNamespace(name='edit'))
+        assert pl.load_prompts()['edit']['content'] == 'edited'
+        assert 'other' in pl.load_prompts()
+    else:
+        with pytest.raises(CLIError) as exc:
+            pl.cmd_edit(SimpleNamespace(name='edit'))
+        assert exc.value.exit_code == 4
+        saved = pl.load_prompts()
+        assert ('edit' not in saved if change == 'deleted'
+                else saved['edit']['content'] == 'concurrent')
+
+
+def test_import_skip_overwrite_and_bom(data_dir):
+    pl = _get_module(data_dir)
+    pl.save_prompts({'one': {'name': 'one', 'content': 'old'}})
+    source = data_dir / 'import.json'
+    source.write_text(json.dumps({'one': {'name': 'one', 'content': 'new'}}), encoding='utf-8-sig')
+    pl.cmd_import(SimpleNamespace(file=str(source), overwrite=False))
+    assert pl.load_prompts()['one']['content'] == 'old'
+    pl.cmd_import(SimpleNamespace(file=str(source), overwrite=True))
+    assert pl.load_prompts()['one']['content'] == 'new'

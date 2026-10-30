@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -63,10 +64,22 @@ def load_prompts() -> dict:
 
 
 def save_prompts(prompts: dict) -> None:
+    error = validate_document('prompts.json', prompts)
+    if error:
+        raise DataError(f'Invalid prompt data: {error}')
     path = get_prompts_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     with data_lock(path.parent):
         atomic_write(path, json.dumps(prompts, ensure_ascii=False, indent=2).encode('utf-8'))
+
+
+@contextmanager
+def prompt_transaction():
+    """Read the latest snapshot and persist only after a successful mutation."""
+    with data_lock(get_prompts_file().parent):
+        prompts = load_prompts()
+        yield prompts
+        save_prompts(prompts)
 
 
 def extract_vars(text: str) -> list[str]:
@@ -78,20 +91,19 @@ def extract_vars(text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def cmd_add(args):
-    prompts = load_prompts()
     name = args.name
-    if name in prompts:
-        raise CLIError(f"Prompt '{name}' already exists. Use 'edit' to modify it.", CONFLICT)
-    ts = now_iso()
-    prompts[name] = {
-        "name": name,
-        "content": args.text,
-        "description": args.description or "",
-        "tags": args.tag or [],
-        "created_at": ts,
-        "updated_at": ts,
-    }
-    save_prompts(prompts)
+    with prompt_transaction() as prompts:
+        if name in prompts:
+            raise CLIError(f"Prompt '{name}' already exists. Use 'edit' to modify it.", CONFLICT)
+        ts = now_iso()
+        prompts[name] = {
+            "name": name,
+            "content": args.text,
+            "description": args.description or "",
+            "tags": args.tag or [],
+            "created_at": ts,
+            "updated_at": ts,
+        }
     set_result(prompts[name])
     vars_found = extract_vars(args.text)
     vars_str = f"  variables: {vars_found}" if vars_found else ""
@@ -191,21 +203,22 @@ def cmd_edit(args):
         subprocess.run([editor, tmp_path], check=True)
         with open(tmp_path, "r", encoding="utf-8") as f:
             new_content = f.read()
-        prompts[name]["content"] = new_content
-        prompts[name]["updated_at"] = now_iso()
-        save_prompts(prompts)
+        with prompt_transaction() as latest:
+            if latest.get(name) != prompts[name]:
+                raise CLIError(f"Prompt '{name}' changed while editing; changes were not saved.", CONFLICT)
+            latest[name]["content"] = new_content
+            latest[name]["updated_at"] = now_iso()
         print(f"Updated prompt '{name}'")
     finally:
         os.unlink(tmp_path)
 
 
 def cmd_delete(args):
-    prompts = load_prompts()
     name = args.name
-    if name not in prompts:
-        raise CLIError(f"Prompt '{name}' not found.", NOT_FOUND)
-    del prompts[name]
-    save_prompts(prompts)
+    with prompt_transaction() as prompts:
+        if name not in prompts:
+            raise CLIError(f"Prompt '{name}' not found.", NOT_FOUND)
+        del prompts[name]
     set_result({'name': name, 'deleted': True})
     print(f"Deleted prompt '{name}'")
 
@@ -220,19 +233,20 @@ def cmd_import(args):
     if not path.exists():
         raise CLIError(f'File not found: {args.file}', NOT_FOUND)
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8-sig") as f:
         incoming = json.load(f)
 
-    prompts = load_prompts()
+    error = validate_document('prompts.json', incoming)
+    if error:
+        raise DataError(f'Invalid prompt import: {error}')
     added, skipped = 0, 0
-    for name, data in incoming.items():
-        if name in prompts and not args.overwrite:
-            skipped += 1
-            continue
-        prompts[name] = data
-        added += 1
-
-    save_prompts(prompts)
+    with prompt_transaction() as prompts:
+        for name, data in incoming.items():
+            if name in prompts and not args.overwrite:
+                skipped += 1
+                continue
+            prompts[name] = data
+            added += 1
     set_result({'imported': added, 'skipped': skipped})
     print(f"Imported {added} prompt(s)" + (f", skipped {skipped} (already exist — use --overwrite)" if skipped else ""))
 

@@ -95,14 +95,23 @@ See [CLI contract](cli-contract.md) for storage layout and compatibility guarant
 
 Config loading cascades:
 ```
-~/.ai-skills.env   → global defaults
-.ai-skills.env     → project override
-.env               → fallback
+shell environment → highest priority
+.ai-skills.env     → current-directory project settings
+.env               → current-directory fallback
+~/.ai-skills.env   → global defaults (lowest priority)
 ```
 
 Each source only sets variables that aren't already in `os.environ` (shell env wins). Later files don't override earlier files.
 
 The loader detects file changes (mtime + size) and reloads automatically, so per-project `.ai-skills.env` files are picked up correctly.
+
+### Budget and Prompt Transactions
+
+Budget mutations and prompt add/delete/import commands hold the data-directory lock across the entire read-modify-write operation. Atomic replacement prevents partial files; the transaction lock prevents lost updates between cooperating writers.
+
+Interactive prompt editing does not hold the lock while the editor is open. On save, it reloads the library under the lock, preserves unrelated changes, and returns conflict exit code `4` if the edited entry was changed or deleted.
+
+Prompt imports validate the entire input before merging, including entries that would otherwise be skipped. Invalid data returns exit code `5` without changing the destination. Entries require a matching `name` and string `content`; optional `description`, `created_at`, and `updated_at` must be strings, and `tags` must be a list of strings. Existing files with invalid optional fields must be corrected before further writes; `ai-data doctor` reports these issues using the same validator.
 
 ### `jsonl_store.py`
 

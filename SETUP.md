@@ -443,7 +443,9 @@ AI_MODEL=qwen2.5-coder
 AI_SKILLS_DATA_DIR=./ai-data   # store data locally in the project
 ```
 
-Settings cascade: project file → `~/.ai-skills.env` → environment variables.
+Priority (highest first): shell environment > project `.ai-skills.env` > project `.env` > `~/.ai-skills.env`. Project files are read from the current working directory.
+
+Migration note: older versions loaded the global file first, preventing project values from overriding it. Project settings now take precedence. Remove unintended project values to keep using global defaults, or export a shell variable to override all files. Reloads also pick up changed or deleted files and working-directory changes.
 
 ---
 
